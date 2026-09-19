@@ -1,0 +1,10 @@
+target/
+build/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.log
+
+# Tailwind standalone CLI binary (downloaded, not committed)
+.tools/

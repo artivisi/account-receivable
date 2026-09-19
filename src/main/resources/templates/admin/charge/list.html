@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Tagihan VA')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('charges')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8 space-y-8">
+    <div class="page-header">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Tagihan VA</h1>
+    </div>
+
+    <form id="search-form" method="get" th:action="@{/admin/charges}" class="toolbar flex flex-wrap items-center gap-3">
+        <input id="charge-search" class="input max-w-xs" type="text" name="q"
+               placeholder="Cari faktur / debitur / VA / ID gateway" th:value="${q}"/>
+        <button id="btn-search" type="submit" class="btn-ghost">Cari</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table id="charge-table" class="data-table">
+                <thead class="bg-slate-50"><tr><th class="th">Dibuat</th><th class="th">Faktur</th><th class="th">Debitur</th>
+                    <th class="th">VA</th><th class="th text-right">Jumlah</th><th class="th text-right">Dibayar</th><th class="th">Status</th></tr></thead>
+                <tbody>
+                <tr th:each="c : ${charges}" th:id="'charge-row-' + ${c.gatewayChargeId}">
+                    <td class="td font-mono" th:text="${#temporals.format(c.createdAt, 'dd MMM yyyy HH:mm')}"></td>
+                    <td class="td">
+                        <a class="font-mono text-primary-700 hover:underline" th:id="'charge-invoice-link-' + ${c.gatewayChargeId}"
+                           th:href="@{/admin/invoices/{id}(id=${c.invoiceId})}" th:text="${c.invoiceNumber}"></a><span
+                           th:if="${c.installmentSequence != null}" class="text-slate-500"
+                           th:text="' · cicilan ' + ${c.installmentSequence} + '/' + ${c.installmentCount}"></span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-mono text-xs text-slate-400" th:title="${c.gatewayChargeId}"
+                                  th:text="${c.gatewayChargeIdShort()}"></span>
+                            <button type="button" class="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                    title="Salin ID gateway" th:attr="data-copy=${c.gatewayChargeId}"
+                                    onclick="navigator.clipboard &amp;&amp; navigator.clipboard.writeText(this.dataset.copy)">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="7" width="9" height="9" rx="1.5"/><path d="M13 7V5.5A1.5 1.5 0 0011.5 4h-6A1.5 1.5 0 004 5.5v6A1.5 1.5 0 005.5 13H7"/></svg>
+                            </button>
+                        </div>
+                    </td>
+                    <td class="td" th:text="${c.debtorName}"></td>
+                    <td class="td font-mono" th:text="${c.vaNumber}"></td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(c.amount)}"></td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(c.cumulativePaid)}"></td>
+                    <td class="td"><span class="badge-muted" th:text="${c.status}"></span></td>
+                </tr>
+                <tr th:if="${charges.isEmpty()}"><td id="charge-empty" class="td text-slate-400" colspan="7">Belum ada tagihan.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:replace="~{fragments :: pagination(${pageInfo}, '/admin/charges', ${q})}"></div>
+    </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Laporan')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('reports')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <div>
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Laporan</h1>
+    </div>
+    <div th:replace="~{fragments :: reportTabs('statement')}"></div>
+    <form id="statement-form" class="card flex items-end gap-3 p-6" method="get" th:action="@{/admin/reports/statement}">
+        <div class="grow">
+            <label class="label" for="statement-debtor-search">Debitur</label>
+            <div th:replace="~{fragments :: lookupPicker('statement-debtor', 'debtorCode', @{/admin/debtors/lookup}, 'Cari kode / nama debitur…', ${debtorCode}, ${selectedDebtorLabel})}"></div>
+        </div>
+        <button id="btn-show-statement" class="btn-primary" type="submit">Tampilkan</button>
+    </form>
+
+    <div id="statement-error" th:if="${error}" class="rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <div id="statement-card" class="card" th:if="${statement}">
+        <div class="flex items-center justify-between px-4 py-3">
+            <span id="statement-debtor-label" class="text-sm font-semibold text-slate-700"
+                  th:text="${statement.debtorCode} + ' · ' + ${statement.debtorName}"></span>
+            <span class="text-sm text-slate-500">sisa
+                <span id="statement-total-outstanding" class="font-mono font-semibold text-primary-700" th:text="${@money.rupiah(statement.totalOutstanding)}"></span>
+                dari <span id="statement-total-amount" class="font-mono" th:text="${@money.rupiah(statement.totalAmount)}"></span></span>
+        </div>
+        <div class="table-wrap">
+            <table id="statement-table" class="data-table">
+                <thead class="bg-slate-50"><tr><th class="th">Faktur</th><th class="th">Terbit</th><th class="th">Jatuh Tempo</th>
+                    <th class="th">Nilai</th><th class="th">Sisa</th><th class="th">Status</th></tr></thead>
+                <tbody>
+                <tr th:each="l : ${statement.lines}" th:id="'statement-row-' + ${l.invoiceNumber}">
+                    <td class="td font-mono" th:text="${l.invoiceNumber}"></td>
+                    <td class="td font-mono" th:text="${l.issueDate}"></td>
+                    <td class="td font-mono" th:text="${l.dueDate}"></td>
+                    <td class="td font-mono" th:text="${@money.amount(l.amount)}"></td>
+                    <td class="td font-mono" th:text="${@money.amount(l.outstanding)}"></td>
+                    <td class="td" th:switch="${l.paymentStatus.name()}">
+                        <span th:case="'OPEN'" class="badge-info">OPEN</span>
+                        <span th:case="'PARTIALLY_PAID'" class="badge-warn">SEBAGIAN</span>
+                        <span th:case="'PAID'" class="badge-ok">LUNAS</span>
+                        <span th:case="'WRITTEN_OFF'" class="badge-muted">WRITE-OFF</span>
+                        <span th:case="*" class="badge-muted" th:text="${l.paymentStatus}"></span>
+                    </td>
+                </tr>
+                <tr th:if="${statement.lines.isEmpty()}"><td id="statement-empty" class="td text-slate-400" colspan="6">Tidak ada faktur.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

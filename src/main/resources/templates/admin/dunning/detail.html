@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Dunning')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('dunning')}"></div>
+<main class="mx-auto max-w-5xl px-4 py-8 space-y-6">
+    <div>
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Detail Dunning</h1>
+        <p class="mt-1 text-sm text-slate-500">Ringkasan pengingat dan status pengiriman per faktur.</p>
+    </div>
+
+    <div id="dunning-summary" class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Tanggal</div>
+            <div id="dunning-run-date" class="mt-1 font-mono text-lg font-semibold text-slate-900" th:text="${run.runDate}"></div>
+        </div>
+        <div class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Kanal</div>
+            <div id="dunning-run-channel" class="mt-1 text-lg font-semibold text-slate-900" th:text="${run.channel}"></div>
+        </div>
+        <div class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Kirim</div>
+            <div id="dunning-run-sent" class="mt-1 font-mono text-lg font-semibold text-accent-700" th:text="${run.sentCount}"></div>
+        </div>
+        <div class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Gagal</div>
+            <div id="dunning-run-errors" class="mt-1 font-mono text-lg font-semibold text-[#a33b32]" th:text="${run.errorCount}"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-wrap">
+        <table id="reminder-table" class="data-table">
+            <thead class="bg-slate-50"><tr><th class="th">Faktur</th><th class="th">Kanal</th><th class="th">Penerima</th><th class="th">Status</th></tr></thead>
+            <tbody>
+            <tr th:each="rem : ${run.reminders}" th:id="'reminder-row-' + ${rem.invoiceNumber}">
+                <td class="td font-mono" th:text="${rem.invoiceNumber}"></td>
+                <td class="td" th:text="${run.channel}"></td>
+                <td class="td" th:text="${rem.recipient}"></td>
+                <td class="td">
+                    <span th:if="${rem.status.name() == 'SENT'}" class="badge-ok">TERKIRIM</span>
+                    <span th:if="${rem.status.name() == 'ERROR'}" class="badge-danger">GAGAL</span>
+                    <span th:if="${rem.status.name() == 'PENDING'}" class="badge-muted">MENUNGGU</span>
+                </td>
+            </tr>
+            <tr th:if="${run.reminders.isEmpty()}"><td id="reminder-empty" class="td text-slate-400" colspan="4">Belum ada pengingat.</td></tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <div id="dunning-error-banner" th:if="${run.errorCount > 0}"
+         class="rounded-lg border border-[#e7c2be] bg-[#fbf1f0] px-4 py-3 text-sm text-[#a33b32]">
+        <p class="font-medium"><span th:text="${run.errorCount}"></span> pengingat gagal terkirim &mdash; kemungkinan data kontak debitur tidak lengkap.</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5">
+            <li th:each="rem : ${run.reminders}" th:if="${rem.status.name() == 'ERROR'}">
+                <span class="font-mono" th:text="${rem.invoiceNumber}"></span> &mdash; <span th:text="${rem.error}"></span>
+            </li>
+        </ul>
+    </div>
+</main>
+</body>
+</html>

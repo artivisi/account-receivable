@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Debitur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('debtors')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8">
+    <div class="page-header mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Debitur</h1>
+        <a id="btn-new-debtor" th:href="@{/admin/debtors/new}" class="btn-primary">+ Debitur Baru</a>
+    </div>
+    <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+
+    <form id="search-form" method="get" th:action="@{/admin/debtors}" class="toolbar mb-4 flex flex-wrap items-center gap-3">
+        <input id="debtor-search" class="input max-w-xs" type="text" name="q"
+               placeholder="Cari kode / nama debitur" th:value="${q}"/>
+        <button id="btn-search" type="submit" class="btn-ghost">Cari</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table id="debtor-table" class="data-table">
+                <thead class="bg-slate-50">
+                <tr><th class="th">Kode</th><th class="th">Nama</th><th class="th">Email</th><th class="th">Telepon</th><th class="th">Status</th><th class="th"></th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="d : ${debtors}" th:id="'debtor-row-' + ${d.code}">
+                    <td class="td font-mono" th:text="${d.code}"></td>
+                    <td class="td" th:text="${d.name}"></td>
+                    <td class="td" th:text="${d.email}"></td>
+                    <td class="td" th:text="${d.phone}"></td>
+                    <td class="td"><span th:class="${d.status.name() == 'ACTIVE'} ? 'badge-ok' : 'badge-muted'" th:text="${d.status.name() == 'ACTIVE'} ? 'AKTIF' : 'NONAKTIF'"></span></td>
+                    <td class="td whitespace-nowrap">
+                        <a class="text-primary-700 hover:underline" th:id="'debtor-detail-link-' + ${d.code}" th:href="@{/admin/debtors/{id}(id=${d.id})}">Detail</a>
+                        <a class="ml-3 text-primary-700 hover:underline" th:id="'edit-debtor-' + ${d.code}" th:href="@{/admin/debtors/{id}/edit(id=${d.id})}">Ubah</a>
+                    </td>
+                </tr>
+                <tr th:if="${debtors.isEmpty()}"><td id="debtor-empty" class="td text-slate-400" colspan="6">Belum ada debitur.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:replace="~{fragments :: pagination(${pageInfo}, '/admin/debtors', ${q})}"></div>
+    </div>
+</main>
+</body>
+</html>

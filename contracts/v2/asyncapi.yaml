@@ -1,0 +1,89 @@
+asyncapi: 3.0.0
+info:
+  title: Kontrak Integrasi Tagihan & Pembayaran
+  version: 2.0.0-draft
+  description: |
+    Antarmuka asinkron antara aplikasi hulu (misalnya aplikasi akademik dan penerimaan
+    mahasiswa) dengan Account Receivable (AR). Aplikasi hulu mengirim *command* dan menerima
+    *event*. AR adalah satu-satunya lawan bicara; Payment Gateway tidak dipanggil langsung.
+
+    Bentuk setiap message didefinisikan di messages.schema.json (JSON Schema 2020-12) dan
+    contoh yang tervalidasi ada di examples/. Aturan yang tidak dapat dinyatakan skema
+    (idempotensi, urutan, penolakan semantik) ada di spesifikasi prosa.
+defaultContentType: application/json
+
+servers:
+  kafka:
+    host: kafka.internal:9092
+    protocol: kafka
+    description: Alamat sebenarnya ditetapkan per deployment.
+
+channels:
+  invoiceCommand:
+    address: invoice-command-v2
+    description: Perintah dari aplikasi hulu ke AR tentang tagihan. Key = debtorCode.
+    messages:
+      invoice.requested: { $ref: '#/components/messages/invoice.requested' }
+      invoice.amended: { $ref: '#/components/messages/invoice.amended' }
+      invoice.planAmended: { $ref: '#/components/messages/invoice.planAmended' }
+      invoice.cancelled: { $ref: '#/components/messages/invoice.cancelled' }
+      invoice.announcementRequested: { $ref: '#/components/messages/invoice.announcementRequested' }
+  debtorCommand:
+    address: debtor-command-v2
+    description: Pendaftaran dan pembaruan debitur. Key = debtorCode.
+    messages:
+      debtor.upserted: { $ref: '#/components/messages/debtor.upserted' }
+  invoiceEvent:
+    address: invoice-event-v2
+    description: |
+      Event dari AR tentang tagihan dan charge. Key = debtorCode.
+      Penolakan (invoice.rejected) berada di topic yang sama dengan keberhasilannya,
+      sehingga consumer yang berlangganan event ini pasti menerima keduanya.
+    messages:
+      invoice.issued: { $ref: '#/components/messages/invoice.issued' }
+      invoice.rejected: { $ref: '#/components/messages/invoice.rejected' }
+      invoice.planAmended: { $ref: '#/components/messages/event.invoice.planAmended' }
+      invoice.cancelled: { $ref: '#/components/messages/event.invoice.cancelled' }
+      invoice.writtenOff: { $ref: '#/components/messages/invoice.writtenOff' }
+      charge.opened: { $ref: '#/components/messages/charge.opened' }
+      charge.repriced: { $ref: '#/components/messages/charge.repriced' }
+      charge.cancelled: { $ref: '#/components/messages/charge.cancelled' }
+  paymentEvent:
+    address: payment-event-v2
+    description: Pembayaran yang diterima. Key = debtorCode.
+    messages:
+      payment.received: { $ref: '#/components/messages/payment.received' }
+
+operations:
+  sendInvoiceCommand:
+    action: send
+    channel: { $ref: '#/channels/invoiceCommand' }
+    summary: Aplikasi hulu mengirim perintah tagihan.
+  sendDebtorCommand:
+    action: send
+    channel: { $ref: '#/channels/debtorCommand' }
+  receiveInvoiceEvent:
+    action: receive
+    channel: { $ref: '#/channels/invoiceEvent' }
+    summary: Aplikasi hulu menerima event tagihan, termasuk penolakan.
+  receivePaymentEvent:
+    action: receive
+    channel: { $ref: '#/channels/paymentEvent' }
+
+components:
+  messages:
+    invoice.requested:              { name: invoice.requested, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.requested' } }
+    invoice.amended:                { name: invoice.amended, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.amended' } }
+    invoice.planAmended:            { name: invoice.planAmended, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.planAmended' } }
+    invoice.cancelled:              { name: invoice.cancelled, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.cancelled' } }
+    invoice.announcementRequested:  { name: invoice.announcementRequested, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.announcementRequested' } }
+    debtor.upserted:                { name: debtor.upserted, payload: { $ref: 'messages.schema.json#/$defs/command.debtor.upserted' } }
+    invoice.issued:                 { name: invoice.issued, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.issued' } }
+    invoice.rejected:               { name: invoice.rejected, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.rejected' } }
+    event.invoice.planAmended:      { name: invoice.planAmended, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.planAmended' } }
+    event.invoice.cancelled:        { name: invoice.cancelled, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.cancelled' } }
+    invoice.writtenOff:             { name: invoice.writtenOff, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.writtenOff' } }
+    charge.opened:                  { name: charge.opened, payload: { $ref: 'messages.schema.json#/$defs/event.charge.opened' } }
+    charge.repriced:                { name: charge.repriced, payload: { $ref: 'messages.schema.json#/$defs/event.charge.repriced' } }
+    charge.cancelled:               { name: charge.cancelled, payload: { $ref: 'messages.schema.json#/$defs/event.charge.cancelled' } }
+    payment.received:               { name: payment.received, payload: { $ref: 'messages.schema.json#/$defs/event.payment.received' } }

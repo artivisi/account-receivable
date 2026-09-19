@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Penyisihan Piutang')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('reports')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <div>
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Penyisihan Piutang Tak Tertagih</h1>
+        <p class="text-sm text-slate-500">
+            Posisi per <span th:text="${report.asOf}"></span> · matriks penyisihan dihitung dari
+            riwayat penagihan sendiri (pendekatan sederhana PSAK 71)
+        </p>
+    </div>
+    <div th:replace="~{fragments :: reportTabs('provision')}"></div>
+
+    <div class="grid gap-4 md:grid-cols-3">
+        <div class="card p-5">
+            <div class="text-sm text-slate-500">Piutang beredar</div>
+            <a th:href="@{/admin/invoices(status='OPEN')}"
+               class="mt-1 block text-2xl font-semibold tabular-nums text-slate-900 hover:text-primary-600 hover:underline"
+               th:text="${#numbers.formatInteger(report.totalOutstanding, 0, 'POINT')}"></a>
+        </div>
+        <div class="card p-5">
+            <div class="text-sm text-slate-500">Penyisihan</div>
+            <a th:href="@{/admin/invoices(status='OPEN', bucket='DUE_90_PLUS')}"
+               class="mt-1 block text-2xl font-semibold tabular-nums text-rose-600 hover:underline"
+               th:text="${#numbers.formatInteger(report.totalAllowance, 0, 'POINT')}"
+               title="Sebagian besar penyisihan berasal dari tagihan lewat 90 hari"></a>
+        </div>
+        <div class="card p-5">
+            <div class="text-sm text-slate-500">Nilai bersih</div>
+            <div class="mt-1 text-2xl font-semibold tabular-nums text-emerald-700"
+                 th:text="${#numbers.formatInteger(report.totalOutstanding - report.totalAllowance, 0, 'POINT')}"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="border-b border-slate-200 px-5 py-4">
+            <h2 class="font-medium">Penyisihan per jenis tagihan dan umur</h2>
+            <p class="mt-1 text-sm text-slate-500">
+                Piutang hari ini (fakta) dikalikan tingkat kerugian historis (asumsi).
+                Klik angka untuk melihat tagihan yang membentuknya.
+            </p>
+        </div>
+        <div class="table-wrap">
+            <table id="provision-table" class="data-table">
+                <thead class="bg-slate-50"><tr>
+                    <th class="th">Jenis</th><th class="th">Umur</th><th class="th">Tagihan</th>
+                    <th class="th">Piutang</th><th class="th">Tingkat kerugian</th><th class="th">Penyisihan</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="a : ${report.allowance}" class="border-b last:border-0 hover:bg-slate-50">
+                    <td class="td" th:text="${a.typeCode} + ' · ' + ${a.typeName}"></td>
+                    <td class="td" th:text="${a.bucket}"></td>
+                    <td class="td tabular-nums">
+                        <a class="text-primary-600 hover:underline"
+                           th:href="@{/admin/invoices(type=${a.typeCode}, bucket=${a.bucket}, status='OPEN')}"
+                           th:text="${a.invoices}"
+                           th:title="'Lihat ' + ${a.invoices} + ' tagihan pada kelompok ini'"></a>
+                    </td>
+                    <td class="td tabular-nums">
+                        <a class="text-primary-600 hover:underline"
+                           th:href="@{/admin/invoices(type=${a.typeCode}, bucket=${a.bucket}, status='OPEN')}"
+                           th:text="${#numbers.formatInteger(a.outstanding, 0, 'POINT')}"></a>
+                    </td>
+                    <td class="td tabular-nums" th:text="${#numbers.formatDecimal(a.lossRate * 100, 1, 1)} + '%'"></td>
+                    <td class="td tabular-nums font-medium" th:text="${#numbers.formatInteger(a.provision, 0, 'POINT')}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="border-b border-slate-200 px-5 py-4">
+            <h2 class="font-medium">Matriks tingkat kerugian</h2>
+            <p class="mt-1 text-sm text-slate-500">
+                Dari tagihan yang terbit minimal <span th:text="${report.maturityDays}"></span> hari lalu,
+                sehingga "tidak pernah dibayar" bermakna. Tagihan yang dibatalkan dikeluarkan — tagihan
+                yang ditarik bukan kerugian kredit, umumnya diterbitkan ulang dengan nomor lain.
+                <strong>-1 hari</strong> = seluruh populasi (belum jatuh tempo).
+            </p>
+        </div>
+        <div class="table-wrap">
+            <table id="rate-table" class="data-table">
+                <thead class="bg-slate-50"><tr>
+                    <th class="th">Jenis</th><th class="th">Hari lewat tempo</th><th class="th">Tagihan</th>
+                    <th class="th">Nilai dasar</th><th class="th">Tertagih</th><th class="th">Tingkat kerugian</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="r : ${report.rates}" class="border-b last:border-0">
+                    <td class="td" th:text="${r.typeCode} + ' · ' + ${r.typeName}"></td>
+                    <td class="td tabular-nums" th:text="${r.daysPastDue}"></td>
+                    <td class="td tabular-nums" th:text="${r.invoices}"></td>
+                    <td class="td tabular-nums" th:text="${#numbers.formatInteger(r.reached, 0, 'POINT')}"></td>
+                    <td class="td tabular-nums" th:text="${#numbers.formatInteger(r.recovered, 0, 'POINT')}"></td>
+                    <td class="td tabular-nums" th:text="${#numbers.formatDecimal(r.lossRate * 100, 1, 1)} + '%'"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

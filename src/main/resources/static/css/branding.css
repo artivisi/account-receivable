@@ -1,0 +1,19 @@
+/*
+ * Deployment branding hook — intentionally empty in the product build.
+ *
+ * A deployment re-brands the UI without rebuilding by serving its own
+ * /css/branding.css (and /img/logo.svg) from an external static location listed
+ * BEFORE classpath:/static/ in spring.web.resources.static-locations, e.g.:
+ *
+ *   spring.web.resources.static-locations=file:/opt/appname/branding/,classpath:/static/
+ *
+ * Then drop the deployment logo at /opt/appname/branding/img/logo.svg and, to
+ * re-theme, redefine the Tailwind theme variables here:
+ *
+ *   :root, :host {
+ *     --color-primary-600: #123456;   ... etc
+ *     --color-accent-500:  #abcdef;
+ *   }
+ *
+ * The engine repo stays generic (no client logo/palette committed).
+ */

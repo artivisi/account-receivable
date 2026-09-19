@@ -1,0 +1,31 @@
+{
+  "type": "invoice.planAmended",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a10",
+  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "correlationId": null,
+    "invoiceNumber": "2026082740999001",
+    "debtorCode": "2600000001",
+    "amount": "6500000.00",
+    "cumulativePaid": "2166667.00",
+    "outstanding": "4333333.00",
+    "paymentPlan": [
+      {
+        "sequence": 1,
+        "dueDate": "2026-09-10",
+        "amount": "2166667.00",
+        "status": "PAID"
+      },
+      {
+        "sequence": 2,
+        "dueDate": "2027-01-10",
+        "amount": "4333333.00",
+        "status": "OPEN"
+      }
+    ],
+    "reason": "Kelonggaran tunggakan disetujui bagian keuangan",
+    "decidedBy": "ar-admin",
+    "decidedAt": "2026-10-21T10:00:00+07:00"
+  }
+}

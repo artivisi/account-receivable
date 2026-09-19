@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Sign in')}"></head>
+<body class="min-h-screen bg-slate-50">
+<div class="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+    <!-- Ambient hi-tech backdrop -->
+    <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary-50 via-slate-50 to-accent-50"></div>
+    <div class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary-200/40 blur-3xl"></div>
+    <div class="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent-200/40 blur-3xl"></div>
+
+    <div class="relative w-full max-w-sm">
+        <div class="mb-6 flex flex-col items-center gap-3 text-center">
+            <img th:src="@{/img/logo.svg}" alt="Logo" class="h-14 w-14 rounded-2xl shadow-md"/>
+            <div>
+                <div class="text-lg font-semibold text-slate-900">Accounts Receivable</div>
+                <div class="text-sm text-slate-500">Subledger Piutang</div>
+            </div>
+        </div>
+
+        <div class="card p-6">
+            <div id="login-error" th:if="${param.error}" class="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700">
+                Invalid username or password.
+            </div>
+            <div id="login-logout" th:if="${param.logout}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700">
+                You have been signed out.
+            </div>
+            <form id="login-form" th:action="@{/login}" method="post" class="space-y-4">
+                <div>
+                    <label class="label" for="username">Username</label>
+                    <input class="input" type="text" id="username" name="username" autofocus required/>
+                </div>
+                <div>
+                    <label class="label" for="password">Password</label>
+                    <input class="input" type="password" id="password" name="password" required/>
+                </div>
+                <button id="btn-login" class="btn-primary w-full" type="submit">Sign in</button>
+            </form>
+        </div>
+
+        <p class="mt-6 text-center text-xs text-slate-400">
+            Developed by <span class="font-medium text-slate-500">ArtiVisi</span>
+        </p>
+    </div>
+</div>
+</body>
+</html>

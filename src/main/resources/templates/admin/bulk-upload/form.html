@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Unggah Massal Faktur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('invoices')}"></div>
+<main class="mx-auto max-w-3xl px-4 py-8 space-y-6">
+    <div>
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Unggah Massal Faktur</h1>
+        <p class="mt-1 text-sm text-slate-500">Impor faktur dari CSV &middot; laporan galat per baris (fail-loud)</p>
+    </div>
+    <div id="form-error" th:if="${error}" class="rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <form id="bulk-upload-form" class="card space-y-4 p-6" th:action="@{/admin/bulk-uploads}" method="post" enctype="multipart/form-data">
+        <p class="text-sm text-slate-600">
+            Format kolom CSV: <span class="font-mono">kode_debitur,tipe_faktur,tanggal_terbit,jatuh_tempo,nilai,keterangan</span>
+            (baris header wajib ada). Satu faktur single-line per baris.
+        </p>
+        <input id="bulk-upload-file" class="input" type="file" name="file" accept=".csv,text/csv" required/>
+        <button id="btn-bulk-upload" class="btn-primary" type="submit">Unggah</button>
+    </form>
+
+    <div id="bulk-upload-result" class="card p-6" th:if="${result}">
+        <div class="mb-3 flex items-center gap-3">
+            <span class="text-sm font-medium text-slate-700">Hasil</span>
+            <span id="bulk-result-status" th:class="${result.status.name() == 'COMPLETED'} ? 'badge-ok' : 'badge-warn'"
+                  th:text="${result.status.name() == 'COMPLETED'} ? 'SELESAI' : 'SELESAI DENGAN GALAT'"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-4 text-sm">
+            <div><div class="label">Baris</div><span id="bulk-result-rows" class="font-mono" th:text="${result.totalRows}"></span></div>
+            <div><div class="label">Berhasil</div><span id="bulk-result-success" class="font-mono text-accent-700" th:text="${result.successCount}"></span></div>
+            <div><div class="label">Galat</div><span id="bulk-result-errors" class="font-mono text-rose-700" th:text="${result.errorCount}"></span></div>
+        </div>
+        <div class="table-wrap mt-4" th:unless="${result.errors.isEmpty()}">
+        <table id="bulk-error-table" class="data-table">
+            <thead class="bg-slate-50"><tr><th class="th">Baris</th><th class="th">Pesan</th></tr></thead>
+            <tbody>
+            <tr th:each="e : ${result.errors}">
+                <td class="td font-mono" th:text="${e.lineNo}"></td><td class="td" th:text="${e.message}"></td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

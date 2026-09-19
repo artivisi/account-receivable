@@ -1,0 +1,17 @@
+{
+  "type": "invoice.requested",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a31",
+  "occurredAt": "2026-09-10T09:14:00+07:00",
+  "producer": "spmb",
+  "payload": {
+    "idempotencyKey": "spmb:daftar-ulang:2600000001:cicilan-2",
+    "debtorCode": "2600000001",
+    "invoiceTypeCode": "02",
+    "issueDate": "2026-09-10",
+    "dueDate": "2027-01-10",
+    "currency": "IDR",
+    "amount": "5333333.00",
+    "description": "Daftar Ulang cicilan 2 dari 3",
+    "openCharge": false
+  }
+}

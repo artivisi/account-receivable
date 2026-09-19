@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Operator')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('operators')}"></div>
+<main class="mx-auto max-w-5xl px-4 py-8 space-y-6">
+    <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Operator</h1>
+    <div id="flash-msg" th:if="${msg}" class="rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+    <div id="flash-error" th:if="${error}" class="rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <form id="operator-form" class="card flex flex-wrap items-end gap-3 p-6" th:action="@{/admin/operators}" method="post">
+        <div><label class="label" for="operator-username">Username</label><input id="operator-username" class="input font-mono" name="username" required/></div>
+        <div><label class="label" for="operator-display-name">Nama Tampilan</label><input id="operator-display-name" class="input" name="displayName" required/></div>
+        <div>
+            <label class="label" for="operator-role">Role</label>
+            <select id="operator-role" class="input" name="role">
+                <option th:each="r : ${roles}" th:value="${r}" th:text="${r}"></option>
+            </select>
+        </div>
+        <div><label class="label" for="operator-password">Kata Sandi</label><input id="operator-password" class="input" type="password" name="password" required/></div>
+        <button id="btn-create-operator" class="btn-primary" type="submit">Buat</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+        <table id="operator-table" class="data-table">
+            <thead class="bg-slate-50"><tr><th class="th">Username</th><th class="th">Nama</th><th class="th">Role</th><th class="th">Aktif</th><th class="th"></th></tr></thead>
+            <tbody>
+            <tr th:each="o : ${operators}" th:id="'operator-row-' + ${o.username}">
+                <td class="td font-mono" th:text="${o.username}"></td>
+                <td class="td" th:text="${o.displayName}"></td>
+                <td class="td" th:text="${o.role}"></td>
+                <td class="td"><span th:class="${o.enabled} ? 'badge-ok' : 'badge-muted'" th:text="${o.enabled} ? 'AKTIF' : 'NONAKTIF'"></span></td>
+                <td class="td">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <form method="post" th:action="@{/admin/operators/{id}/enabled(id=${o.id})}">
+                            <input type="hidden" name="enabled" th:value="${!o.enabled}"/>
+                            <button th:id="'btn-toggle-operator-' + ${o.username}" class="text-primary-700 hover:underline" type="submit"
+                                    th:text="${o.enabled} ? 'Nonaktifkan' : 'Aktifkan'">Toggle</button>
+                        </form>
+                        <form method="post" th:action="@{/admin/operators/{id}/reset-password(id=${o.id})}"
+                              class="flex items-center gap-2">
+                            <input th:id="'input-reset-password-' + ${o.username}" class="input w-40 px-2 py-1 text-xs"
+                                   type="password" name="password" placeholder="kata sandi sementara (12+)" minlength="12" required/>
+                            <button th:id="'btn-reset-password-' + ${o.username}" class="text-primary-700 hover:underline"
+                                    type="submit">Reset Kata Sandi</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

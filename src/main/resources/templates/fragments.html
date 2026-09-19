@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title th:text="${title} + ' · Accounts Receivable'">Accounts Receivable</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/img/logo.svg}"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <!-- Deployment branding hook: an external static location may shadow this file
+         (and /img/logo.svg) to re-theme without rebuilding. See css/branding.css. -->
+    <link rel="stylesheet" th:href="@{/css/branding.css}"/>
+    <script defer th:src="@{/js/htmx.min.js}"></script>
+    <script defer th:src="@{/js/lookup-picker.js}"></script>
+</head>
+<body>
+<aside th:fragment="sidebar(active)" id="sidebar"
+       class="fixed inset-y-0 left-0 z-30 flex w-60 flex-col bg-gradient-to-b from-primary-900 to-primary-950 text-primary-100 shadow-xl">
+    <!-- Brand: deployment logo shadows /img/logo.svg; shown in a light chip so any mark stays legible on the dark rail. -->
+    <a id="brand" th:href="@{/admin}" class="flex items-center gap-3 px-4 py-5">
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm">
+            <img id="brand-logo" th:src="@{/img/logo.svg}" alt="Logo" class="h-full w-full object-contain"/>
+        </span>
+        <span class="min-w-0">
+            <span id="brand-name" class="block truncate text-sm font-semibold tracking-wide text-white">Piutang Usaha</span>
+            <span class="block text-[11px] text-primary-300">Subledger Piutang</span>
+        </span>
+    </a>
+
+    <nav id="main-nav" class="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
+        <a id="nav-dashboard" th:href="@{/admin}" class="nav-link"
+           th:classappend="${active == 'dashboard'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3H9v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z"/></svg>
+            <span>Dashboard</span>
+        </a>
+
+        <div class="nav-section">Piutang</div>
+        <a id="nav-invoices" th:href="@{/admin/invoices}" class="nav-link"
+           th:classappend="${active == 'invoices'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
+            <span>Faktur</span>
+        </a>
+        <a id="nav-bulk-upload" th:href="@{/admin/bulk-uploads}" class="nav-link"
+           th:classappend="${active == 'bulk-upload'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M9.25 13.25a.75.75 0 001.5 0V4.636l2.955 3.129a.75.75 0 001.09-1.03l-4.25-4.5a.75.75 0 00-1.09 0l-4.25 4.5a.75.75 0 101.09 1.03L9.25 4.636v8.614z"/><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/></svg>
+            <span>Unggah Massal</span>
+        </a>
+
+        <div class="nav-section">Penagihan</div>
+        <a id="nav-write-off-queue" th:href="@{/admin/invoices/write-off-queue}" class="nav-link"
+           th:classappend="${active == 'write-off-queue'} ? 'nav-link-active' : ''">
+            <span>Antrean Hapus Buku</span>
+        </a>
+        <a id="nav-anomalies" th:href="@{/admin/anomalies}" class="nav-link"
+           th:classappend="${active == 'anomalies'} ? 'nav-link-active' : ''">
+            <span>Temuan Piutang</span>
+        </a>
+        <a id="nav-charges" th:href="@{/admin/charges}" class="nav-link"
+           th:classappend="${active == 'charges'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
+            <span>Tagihan VA</span>
+        </a>
+        <a id="nav-cash-applications" th:href="@{/admin/cash-applications}" class="nav-link"
+           th:classappend="${active == 'cash-applications'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+            <span>Aplikasi Kas</span>
+        </a>
+        <a id="nav-dunning" th:href="@{/admin/dunning}" class="nav-link"
+           th:classappend="${active == 'dunning'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+            <span>Dunning</span>
+        </a>
+
+        <div class="nav-section">Master Data</div>
+        <a id="nav-debtors" th:href="@{/admin/debtors}" class="nav-link"
+           th:classappend="${active == 'debtors'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+            <span>Debitur</span>
+        </a>
+        <a id="nav-types" th:href="@{/admin/invoice-types}" class="nav-link"
+           th:classappend="${active == 'types'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+            <span>Tipe Faktur</span>
+        </a>
+
+        <div class="nav-section">Lainnya</div>
+        <a id="nav-reports" th:href="@{/admin/reports/aging}" class="nav-link"
+           th:classappend="${active == 'reports'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+            <span>Laporan</span>
+        </a>
+        <a id="nav-audit" th:href="@{/admin/audit}" class="nav-link"
+           th:classappend="${active == 'audit'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
+            <span>Log Audit</span>
+        </a>
+        <a id="nav-operators" sec:authorize="hasRole('ADMIN')" th:href="@{/admin/operators}" class="nav-link"
+           th:classappend="${active == 'operators'} ? 'nav-link-active' : ''">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+            <span>Operator</span>
+        </a>
+    </nav>
+
+    <div class="mt-auto border-t border-white/10 px-4 py-4">
+        <div class="flex items-center justify-between gap-2">
+            <span id="current-user" sec:authentication="name" class="truncate text-sm font-medium text-white">user</span>
+            <form th:action="@{/logout}" method="post" class="contents">
+                <button id="btn-logout" type="submit" title="Logout" aria-label="Logout"
+                        class="rounded-lg p-2 text-primary-200 transition hover:bg-white/10 hover:text-white">
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h5a1 1 0 100-2H4V5h4a1 1 0 000-2H3z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H7a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                </button>
+            </form>
+        </div>
+        <p class="mt-3 text-[11px] leading-tight text-primary-300">
+            Developed by <span class="font-semibold text-primary-100">ArtiVisi</span>
+        </p>
+    </div>
+</aside>
+
+<!-- Shared tab-nav for the 3 Laporan (Reports) pages: aging, recap, statement.
+     Each keeps its own route/controller; this is chrome only. -->
+<nav th:fragment="reportTabs(active)" id="report-tabs" class="flex gap-6 border-b border-slate-200">
+    <a id="report-tab-aging" th:href="@{/admin/reports/aging}"
+       class="border-b-2 px-1 py-3 text-sm font-medium"
+       th:classappend="${active == 'aging'} ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'">Umur Piutang per Debitur</a>
+    <a id="report-tab-recap" th:href="@{/admin/reports/recap}"
+       class="border-b-2 px-1 py-3 text-sm font-medium"
+       th:classappend="${active == 'recap'} ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'">Rekap per Tipe</a>
+    <a id="report-tab-provision" th:href="@{/admin/reports/provision}"
+       class="border-b-2 px-1 py-3 text-sm font-medium"
+       th:classappend="${active == 'provision'} ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'">Penyisihan Piutang</a>
+    <a id="report-tab-statement" th:href="@{/admin/reports/statement}"
+       class="border-b-2 px-1 py-3 text-sm font-medium"
+       th:classappend="${active == 'statement'} ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'">Rekening Koran</a>
+</nav>
+
+<!-- Reusable pagination bar. pageInfo = Spring Data Page<?>; path = base URL (e.g. '/admin/debtors');
+     q = current search term (preserved in prev/next links, may be null). Place as the last child inside a .card. -->
+<div th:fragment="pagination(pageInfo, path, q)"
+     class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-600">
+    <span id="pagination-info">Menampilkan
+        <span th:text="${pageInfo.totalElements == 0 ? 0 : pageInfo.number * pageInfo.size + 1}">0</span>&ndash;<span
+        th:text="${pageInfo.number * pageInfo.size + pageInfo.numberOfElements}">0</span> dari
+        <span th:text="${pageInfo.totalElements}">0</span></span>
+    <div class="flex items-center gap-3">
+        <a th:if="${!pageInfo.first}" id="btn-prev-page" class="btn-ghost px-3 py-1"
+           th:href="@{__${path}__(q=${q}, page=${pageInfo.number - 1})}">&lsaquo; Sebelumnya</a>
+        <span th:if="${pageInfo.first}" id="btn-prev-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">&lsaquo; Sebelumnya</span>
+        <span id="page-indicator" th:text="${pageInfo.number + 1} + ' / ' + ${pageInfo.totalPages == 0 ? 1 : pageInfo.totalPages}">1 / 1</span>
+        <a th:if="${!pageInfo.last and pageInfo.totalPages > 0}" id="btn-next-page" class="btn-ghost px-3 py-1"
+           th:href="@{__${path}__(q=${q}, page=${pageInfo.number + 1})}">Berikutnya &rsaquo;</a>
+        <span th:if="${pageInfo.last or pageInfo.totalPages == 0}" id="btn-next-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">Berikutnya &rsaquo;</span>
+    </div>
+</div>
+
+<!-- Generic typeahead lookup picker (replaces a load-everything <select>). Reusable for any entity:
+       fieldId       — base id; hidden field is `${fieldId}`, search input `${fieldId}-search`
+       fieldName     — the submitted form field name (e.g. 'debtorCode', 'invoiceTypeCode')
+       lookupUrl     — HTMX source returning result options (e.g. @{/admin/debtors/lookup})
+       placeholder   — search-field placeholder
+       selectedCode / selectedLabel — prefill an already-chosen value
+     Behaviour is in /js/lookup-picker.js; result options carry data-code/data-label. `input changed`
+     (not keyup) so a programmatic fill triggers it too. -->
+<div th:fragment="lookupPicker(fieldId, fieldName, lookupUrl, placeholder, selectedCode, selectedLabel)"
+     th:id="${fieldId} + '-picker'" class="lookup-picker relative">
+    <input type="hidden" th:id="${fieldId}" th:name="${fieldName}" th:value="${selectedCode}" data-picker-value/>
+    <input type="text" class="input" autocomplete="off" data-picker-search
+           th:id="${fieldId} + '-search'" name="q"
+           th:placeholder="${placeholder}" th:value="${selectedLabel}"
+           th:attr="hx-get=${lookupUrl}, hx-target='#' + ${fieldId} + '-results'"
+           hx-trigger="focus, input changed delay:250ms" hx-swap="innerHTML"/>
+    <div th:id="${fieldId} + '-results'" data-picker-results
+         class="lookup-picker-results absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg empty:hidden"></div>
+</div>
+</body>
+</html>

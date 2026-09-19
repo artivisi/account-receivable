@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Tipe Faktur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('types')}"></div>
+<main class="mx-auto max-w-2xl px-4 py-8">
+    <h1 id="page-title" class="mb-6 text-2xl font-semibold text-slate-900"
+        th:text="${mode == 'edit'} ? 'Ubah Tipe Faktur' : 'Tipe Faktur Baru'">Tipe Faktur</h1>
+    <div id="form-error" th:if="${error}" class="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+    <form id="invoice-type-form" class="card space-y-4 p-6"
+          th:action="${mode == 'edit'} ? @{/admin/invoice-types/{id}(id=${type.id})} : @{/admin/invoice-types}" method="post">
+        <div>
+            <label class="label" for="type-code">Kode</label>
+            <input id="type-code" class="input font-mono" name="code" th:value="${type != null} ? ${type.code} : ''"
+                   th:readonly="${mode == 'edit'}" required/>
+        </div>
+        <div>
+            <label class="label" for="type-name">Nama</label>
+            <input id="type-name" class="input" name="name" th:value="${type != null} ? ${type.name} : ''" required/>
+        </div>
+        <div class="flex items-center gap-2">
+            <input id="type-active" type="checkbox" name="active" value="true" th:checked="${type == null or type.active}"/>
+            <label class="text-sm text-slate-700" for="type-active">Aktif</label>
+        </div>
+        <div class="flex gap-2">
+            <button id="btn-save-type" class="btn-primary" type="submit">Simpan</button>
+            <a id="btn-cancel" class="btn-ghost" th:href="@{/admin/invoice-types}">Batal</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- HTMX fragment: rows of active invoice types swapped into a lookupPicker's results container. -->
+<th:block th:fragment="results">
+    <button type="button" th:each="t : ${types}" data-picker-option
+            th:id="'type-option-' + ${t.code}"
+            th:attr="data-code=${t.code}, data-label=${t.code} + ' · ' + ${t.name}"
+            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
+        <span class="font-mono text-slate-500" th:text="${t.code}">CODE</span>
+        <span class="truncate" th:text="${t.name}">Name</span>
+    </button>
+    <div th:if="${types.isEmpty()}" class="px-3 py-2 text-sm text-slate-400">Tidak ada tipe faktur.</div>
+</th:block>
+</body>
+</html>

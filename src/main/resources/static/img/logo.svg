@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Accounts Receivable">
+  <rect width="48" height="48" rx="11" fill="#2e3192"/>
+  <text x="24" y="26" text-anchor="middle" dominant-baseline="central"
+        font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="19" font-weight="700"
+        letter-spacing="-1" fill="#ffffff">AR</text>
+  <rect x="15" y="34" width="18" height="3" rx="1.5" fill="#58c034"/>
+</svg>

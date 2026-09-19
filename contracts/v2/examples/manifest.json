@@ -1,0 +1,231 @@
+{
+  "description": "Setiap contoh divalidasi oleh ContractFixturesTest di AR. schemaValid=false berarti skema sudah menolaknya; schemaValid=true dengan rejection berarti lolos skema tetapi ditolak AR saat diproses (aturan semantik).",
+  "fixtures": [
+    {
+      "file": "examples/commands/invoice.requested/valid-with-plan.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.requested/valid-single-payment.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.requested/invalid-amount-zero.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": false,
+      "rejection": "AMOUNT_INVALID"
+    },
+    {
+      "file": "examples/commands/invoice.requested/invalid-amount-as-number.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID",
+      "note": "Nominal harus string desimal; angka JSON ditolak."
+    },
+    {
+      "file": "examples/commands/invoice.requested/invalid-missing-idempotency-key.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID"
+    },
+    {
+      "file": "examples/commands/invoice.requested/rejected-plan-sum-mismatch.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": true,
+      "rejection": "PLAN_INVALID",
+      "note": "Lolos skema; ditolak AR karena jumlah cicilan (4333334.00) tidak sama dengan amount (6500000.00)."
+    },
+    {
+      "file": "examples/commands/invoice.requested/rejected-due-before-issue.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": true,
+      "rejection": "DUE_DATE_INVALID",
+      "note": "Lolos skema; ditolak AR."
+    },
+    {
+      "file": "examples/commands/invoice.requested/rejected-plan-last-leg-differs.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": true,
+      "rejection": "PLAN_INVALID",
+      "note": "Lolos skema; ditolak AR karena dueDate tagihan (2027-04-27) berbeda dengan jatuh tempo cicilan terakhir (2026-11-10)."
+    },
+    {
+      "file": "examples/commands/invoice.requested/rejected-unknown-debtor.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": true,
+      "rejection": "DEBTOR_NOT_FOUND",
+      "note": "Lolos skema; ditolak AR."
+    },
+    {
+      "file": "examples/commands/invoice.amended/valid-amount-and-due-date.json",
+      "schemaRef": "#/$defs/command.invoice.amended",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.amended/valid-amount-only.json",
+      "schemaRef": "#/$defs/command.invoice.amended",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.amended/valid-amount-zero-cancels.json",
+      "schemaRef": "#/$defs/command.invoice.amended",
+      "schemaValid": true,
+      "note": "Nominal nol diizinkan pada koreksi: tagihan menjadi CANCELLED."
+    },
+    {
+      "file": "examples/commands/invoice.amended/invalid-neither-amount-nor-due-date.json",
+      "schemaRef": "#/$defs/command.invoice.amended",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID"
+    },
+    {
+      "file": "examples/commands/invoice.amended/invalid-missing-reason.json",
+      "schemaRef": "#/$defs/command.invoice.amended",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID"
+    },
+    {
+      "file": "examples/commands/invoice.planAmended/valid-split-remainder.json",
+      "schemaRef": "#/$defs/command.invoice.planAmended",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.planAmended/valid-early-settlement.json",
+      "schemaRef": "#/$defs/command.invoice.planAmended",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.planAmended/invalid-empty-plan.json",
+      "schemaRef": "#/$defs/command.invoice.planAmended",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID"
+    },
+    {
+      "file": "examples/commands/invoice.planAmended/rejected-sum-not-outstanding.json",
+      "schemaRef": "#/$defs/command.invoice.planAmended",
+      "schemaValid": true,
+      "rejection": "PLAN_INVALID",
+      "note": "Lolos skema; jumlah 3249999.00 bukan sisa kewajiban 4333333.00."
+    },
+    {
+      "file": "examples/commands/invoice.cancelled/valid-superseded.json",
+      "schemaRef": "#/$defs/command.invoice.cancelled",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.cancelled/valid-duplicate.json",
+      "schemaRef": "#/$defs/command.invoice.cancelled",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.cancelled/invalid-superseded-without-replacedBy.json",
+      "schemaRef": "#/$defs/command.invoice.cancelled",
+      "schemaValid": false,
+      "rejection": "REPLACED_BY_REQUIRED"
+    },
+    {
+      "file": "examples/commands/invoice.cancelled/invalid-unknown-reason.json",
+      "schemaRef": "#/$defs/command.invoice.cancelled",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID"
+    },
+    {
+      "file": "examples/commands/invoice.announcementRequested/valid.json",
+      "schemaRef": "#/$defs/command.invoice.announcementRequested",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.announcementRequested/rejected-unknown-invoice.json",
+      "schemaRef": "#/$defs/command.invoice.announcementRequested",
+      "schemaValid": true,
+      "rejection": "INVOICE_NOT_FOUND",
+      "note": "Lolos skema; ditolak AR."
+    },
+    {
+      "file": "examples/commands/debtor.upserted/valid.json",
+      "schemaRef": "#/$defs/command.debtor.upserted",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/debtor.upserted/valid-minimal.json",
+      "schemaRef": "#/$defs/command.debtor.upserted",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/debtor.upserted/invalid-missing-name.json",
+      "schemaRef": "#/$defs/command.debtor.upserted",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID"
+    },
+    {
+      "file": "examples/events/invoice.issued/valid.json",
+      "schemaRef": "#/$defs/event.invoice.issued",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/invoice.rejected/valid.json",
+      "schemaRef": "#/$defs/event.invoice.rejected",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/invoice.planAmended/valid.json",
+      "schemaRef": "#/$defs/event.invoice.planAmended",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/invoice.planAmended/valid-decided-in-ar.json",
+      "schemaRef": "#/$defs/event.invoice.planAmended",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/charge.opened/valid.json",
+      "schemaRef": "#/$defs/event.charge.opened",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/charge.repriced/valid.json",
+      "schemaRef": "#/$defs/event.charge.repriced",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/charge.cancelled/valid.json",
+      "schemaRef": "#/$defs/event.charge.cancelled",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/payment.received/valid.json",
+      "schemaRef": "#/$defs/event.payment.received",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/payment.received/valid-with-source-number.json",
+      "schemaRef": "#/$defs/event.payment.received",
+      "schemaValid": true,
+      "note": "Tagihan yang dikenal dengan dua nomor: nomor terbitan AR dan nomor asal yang masih dipegang aplikasi kampus. sourceInvoiceNumber hanya ada ketika keduanya berbeda."
+    },
+    {
+      "file": "examples/events/invoice.cancelled/valid.json",
+      "schemaRef": "#/$defs/event.invoice.cancelled",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/invoice.writtenOff/valid.json",
+      "schemaRef": "#/$defs/event.invoice.writtenOff",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/commands/invoice.requested/valid-without-charge.json",
+      "schemaRef": "#/$defs/command.invoice.requested",
+      "schemaValid": true,
+      "note": "Tagihan dicatat tanpa membuka VA. Dipakai ketika seluruh cicilan diterbitkan di muka dan hanya satu yang boleh dibayar pada satu waktu."
+    },
+    {
+      "file": "examples/commands/charge.openRequested/valid.json",
+      "schemaRef": "#/$defs/command.charge.openRequested",
+      "schemaValid": true,
+      "note": "Membuka VA untuk tagihan yang diterbitkan dengan openCharge false. Ditolak VA_NUMBER_BUSY bila tagihan lain milik debitur dan jenis yang sama masih menempati nomor VA tersebut."
+    }
+  ]
+}

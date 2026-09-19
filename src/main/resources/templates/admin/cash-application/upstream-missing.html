@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Pembayaran Belum Tercatat di Aplikasi Penagih')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('cash-applications')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8">
+    <div class="mb-6">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">
+            Pembayaran Belum Tercatat di Aplikasi Penagih
+        </h1>
+        <p class="mt-1 text-sm text-slate-500">
+            Pembayaran yang <strong>sudah diterima dan sudah benar di sini</strong>, tetapi tidak
+            pernah tercatat di aplikasi yang menerbitkan tagihannya. Debitur sudah membayar,
+            tetapi di aplikasi penagih masih tampak menunggak.
+        </p>
+    </div>
+
+    <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+    <div id="flash-error" th:if="${error}" class="mb-4 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <!-- Uangnya tidak hilang, dan tidak ada yang perlu diperbaiki di buku ini — justru karena buku
+         ini benar, selisihnya tidak bisa terlihat dari sini dan harus dilaporkan pemeriksaan luar. -->
+    <div class="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+        <strong>Uangnya sudah masuk.</strong> Yang perlu dikerjakan ada di aplikasi penagih, bukan di
+        sini: catat pembayarannya di sana supaya debitur tidak ditagih lagi dan layanannya tidak
+        diblokir. Setelah itu tandai barisnya <em>Sudah dicatat</em>.
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <table id="upstream-missing-table" class="w-full text-sm">
+            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+                <th class="th">Diterima</th>
+                <th class="th">Referensi Bank</th>
+                <th class="th text-right">Jumlah</th>
+                <th class="th">Temuan</th>
+                <th class="th">Tindakan</th>
+            </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            <tr th:each="row : ${rows}" th:id="'upstream-row-' + ${row.id}" class="align-top">
+                <td class="td font-mono text-xs" th:text="${#temporals.format(row.receivedAt, 'dd MMM yyyy HH:mm')}"></td>
+                <td class="td font-mono text-xs" th:text="${row.gatewayPaymentReference}"></td>
+                <td class="td text-right font-mono" th:text="${@money.rupiah(row.amount)}"></td>
+                <td class="td">
+                    <div class="text-xs text-slate-600" th:text="${row.upstreamMissingNote}"></div>
+                    <div class="mt-1 text-xs text-slate-400"
+                         th:text="'Terdeteksi ' + ${#temporals.format(row.upstreamMissingAt, 'dd MMM yyyy HH:mm')}"></div>
+                </td>
+                <td class="td">
+                    <form method="post" class="flex items-center gap-1"
+                          th:action="@{/admin/cash-applications/{id}/upstream-cleared(id=${row.id})}">
+                        <input th:id="'input-cleared-note-' + ${row.id}" name="note" required maxlength="255"
+                               placeholder="Sudah dicatat di mana / oleh siapa"
+                               class="w-56 rounded-md border border-slate-300 px-2 py-1 text-xs">
+                        <button th:id="'btn-cleared-' + ${row.id}" class="btn-ghost px-2 py-1 text-xs"
+                                type="submit">Sudah dicatat</button>
+                    </form>
+                </td>
+            </tr>
+            <tr th:if="${rows.isEmpty()}">
+                <td class="td text-slate-500" colspan="5">
+                    Tidak ada pembayaran yang tertinggal di aplikasi penagih.
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between text-sm text-slate-500">
+        <span>Total <span id="upstream-total" th:text="${total}"></span> pembayaran</span>
+        <div class="flex items-center gap-2">
+            <a th:if="${!pageInfo.first}" id="btn-prev-page" class="btn-ghost px-3 py-1"
+               th:href="@{/admin/cash-applications/upstream-missing(page=${pageInfo.number - 1})}">&lsaquo; Sebelumnya</a>
+            <a th:if="${!pageInfo.last and pageInfo.totalPages > 0}" id="btn-next-page" class="btn-ghost px-3 py-1"
+               th:href="@{/admin/cash-applications/upstream-missing(page=${pageInfo.number + 1})}">Berikutnya &rsaquo;</a>
+        </div>
+    </div>
+
+    <p class="mt-6 text-xs text-slate-400">
+        Baris di sini dilaporkan pemeriksaan yang membandingkan pembayaran di gateway dengan catatan
+        aplikasi penagih. Selisihnya tidak bisa dilihat dari buku ini sendiri: di sini fakturnya sudah
+        LUNAS dan kasnya sudah teralokasi — semuanya benar. Baris yang sudah ditandai tetap disimpan,
+        supaya debitur yang pembayarannya berulang kali tertinggal bisa dibedakan dari kejadian sekali.
+    </p>
+</main>
+</body>
+</html>

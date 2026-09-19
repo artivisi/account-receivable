@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Dunning')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('dunning')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <div>
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Pengingat Tunggakan (Dunning)</h1>
+        <p class="mt-1 text-sm text-slate-500">Kirim pengingat massal untuk faktur menunggak &middot; email / SMS</p>
+    </div>
+
+    <div id="flash-msg" th:if="${msg}" class="rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+    <div id="flash-error" th:if="${error}" class="rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <form id="dunning-form" class="card flex flex-wrap items-end gap-3 p-6" th:action="@{/admin/dunning}" method="post">
+        <div>
+            <label class="label" for="dunning-channel">Kanal</label>
+            <select id="dunning-channel" class="input" name="channel">
+                <option th:each="c : ${channels}" th:value="${c}" th:text="${c}"></option>
+            </select>
+        </div>
+        <div>
+            <label class="label" for="dunning-min-days">Min. Hari Menunggak</label>
+            <input id="dunning-min-days" class="input" name="minDaysOverdue" value="0"/>
+        </div>
+        <button id="btn-run-dunning" class="btn-primary" type="submit">&#9654; Jalankan Dunning</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+        <table id="dunning-table" class="data-table">
+            <thead class="bg-slate-50"><tr><th class="th">Tanggal</th><th class="th">Kanal</th><th class="th">Min Hari</th>
+                <th class="th">Pengingat</th><th class="th">Kirim</th><th class="th">Gagal</th><th class="th">Run</th></tr></thead>
+            <tbody>
+            <tr th:each="r : ${runs}" th:id="'dunning-row-' + ${r.id}">
+                <td class="td font-mono" th:text="${r.runDate}"></td>
+                <td class="td" th:text="${r.channel}"></td>
+                <td class="td font-mono" th:text="${r.minDaysOverdue}"></td>
+                <td class="td font-mono" th:text="${r.totalReminders}"></td>
+                <td class="td font-mono" th:text="${r.sentCount}"></td>
+                <td class="td font-mono" th:text="${r.errorCount}"></td>
+                <td class="td"><a class="text-primary-700 hover:underline" th:id="'dunning-view-' + ${r.id}" th:href="@{/admin/dunning/{id}(id=${r.id})}">Lihat &rarr;</a></td>
+            </tr>
+            <tr th:if="${runs.isEmpty()}"><td id="dunning-empty" class="td text-slate-400" colspan="7">Belum ada dunning run.</td></tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

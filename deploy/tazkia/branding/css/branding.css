@@ -1,0 +1,37 @@
+/*
+ * Tazkia deployment branding for account-receivable.
+ *
+ * Drop-in override for the engine's empty /css/branding.css. Served from an external
+ * static location listed BEFORE classpath:/static/ (see ../../README.md), it redefines
+ * the Tailwind theme variables at runtime — no rebuild, nothing client-specific in the
+ * engine repo.
+ *
+ * Palette derived from the Tazkia institutional logo:
+ *   primary = #194189 (blue)   accent = #EE7B1D (orange)
+ * Both are branded: primary drives the chrome (rail, buttons, links, focus, key figures);
+ * accent drives success badges (PAID / ACTIVE / SENT), highlights and success flash notices.
+ */
+:root {
+  /* ---- Primary: Tazkia blue (nav rail, buttons, links, focus, key figures) ---- */
+  --color-primary-50:  #eff4fb;
+  --color-primary-100: #dbe6f4;
+  --color-primary-200: #b7cde9;
+  --color-primary-300: #86a8d7;
+  --color-primary-400: #5480c0;
+  --color-primary-500: #2f5ea6;
+  --color-primary-600: #194189; /* brand */
+  --color-primary-700: #163a76;
+  --color-primary-800: #142f5d;
+  --color-primary-900: #0f2444; /* sidebar gradient top */
+  --color-primary-950: #081426; /* sidebar gradient bottom */
+
+  /* ---- Accent: Tazkia orange (success badges, highlights, flash notices) ---- */
+  --color-accent-50:  #fef6ec;
+  --color-accent-100: #fde8ce;
+  --color-accent-200: #fbcf9c;
+  --color-accent-400: #f4993f;
+  --color-accent-500: #ee7b1d; /* brand */
+  --color-accent-600: #d1690f;
+  --color-accent-700: #a4530f;
+  --color-accent-800: #7c3f10;
+}

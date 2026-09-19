@@ -1,0 +1,11 @@
+{
+  "type": "invoice.rejected",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a10",
+  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "correlationId": "aplikasi-akademik:ukt:2600000001:20262",
+    "code": "AMOUNT_INVALID",
+    "reason": "amount harus lebih besar dari nol; diterima 0.00"
+  }
+}

@@ -1,0 +1,101 @@
+server:
+  servlet:
+    session:
+      tracking-modes: cookie
+
+spring:
+  application:
+    name: account-receivable
+  # No defaults: missing DB config fails startup (fail loud).
+  datasource:
+    url: ${AR_DB_URL}
+    username: ${AR_DB_USERNAME}
+    password: ${AR_DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway is the single source of truth for schema.
+      ddl-auto: none
+  flyway:
+    enabled: true
+  kafka:
+    producer:
+      # Notification hub broker. Required; producer only (no @KafkaListener in AR).
+      bootstrap-servers: ${AR_KAFKA_BOOTSTRAP_SERVERS}
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+ar:
+  security:
+    # Base64-encoded 32-byte (AES-256) key. Required; app fails to start if absent or wrong length.
+    secret-key: ${AR_SECRET_KEY}
+  admin:
+    # Bootstrap admin for the admin UI. Required; created on first start if absent.
+    username: ${AR_ADMIN_USERNAME}
+    password: ${AR_ADMIN_PASSWORD}
+  invoice:
+    # Document-numbering scheme. Required; no default prefix.
+    number-prefix: ${AR_INVOICE_NUMBER_PREFIX:}
+    credit-note-prefix: ${AR_CREDIT_NOTE_PREFIX}
+    number-pad-length: ${AR_INVOICE_NUMBER_PAD_LENGTH}
+    # SEQUENTIAL (prefix + running number) or DATED_TYPE_CODE (yyyyMMdd + type VA code + the day's
+    # sequence, for a deployment whose bill numbers are already that shape). Required; no default.
+    number-strategy: ${AR_INVOICE_NUMBER_STRATEGY}
+  gateway:
+    # Payment-gateway consumer config. All required; missing values fail startup.
+    # client-secret authenticates outbound calls and verifies inbound webhook signatures.
+    base-url: ${AR_GATEWAY_BASE_URL}
+    client-id: ${AR_GATEWAY_CLIENT_ID}
+    client-secret: ${AR_GATEWAY_CLIENT_SECRET}
+    escrow-code: ${AR_GATEWAY_ESCROW_CODE}
+    # Outbound charge-cancellation outbox tuning.
+    max-attempts: ${AR_GATEWAY_MAX_ATTEMPTS}
+    backoff-base-seconds: ${AR_GATEWAY_BACKOFF_BASE_SECONDS}
+    poll-interval-ms: ${AR_GATEWAY_POLL_INTERVAL_MS}
+  notification:
+    # Hub notification config. All required; missing values fail startup.
+    # Config ids name template sets in the deployment's notification hub (a versioned
+    # (configId, variable-set) contract).
+    topic: ${AR_NOTIFICATION_TOPIC}
+    issued-config: ${AR_NOTIFICATION_ISSUED_CONFIG}
+    payment-config: ${AR_NOTIFICATION_PAYMENT_CONFIG}
+    dunning-config: ${AR_NOTIFICATION_DUNNING_CONFIG}
+    max-attempts: ${AR_NOTIFICATION_MAX_ATTEMPTS}
+    backoff-base-seconds: ${AR_NOTIFICATION_BACKOFF_BASE_SECONDS}
+    poll-interval-ms: ${AR_NOTIFICATION_POLL_INTERVAL_MS}
+    sms-enabled: ${AR_NOTIFICATION_SMS_ENABLED}
+    # Which names the hub expects: PASSTHROUGH (AR's own) or TEMPLATE. Required — a hub refuses a
+    # payload whose names it does not recognise and says so only in its own log.
+    payload-mapper: ${AR_NOTIFICATION_PAYLOAD_MAPPER}
+    # TEMPLATE reads ar.notification.template from a deployment file, imported with
+    # SPRING_CONFIG_IMPORT=file:<path>. Example: src/test/resources/notification/template-example.yml.
+  contract:
+    # The v2 async contract with upstream applications. mode: OFF (no upstream on a broker; nothing
+    # recorded), OUTBOX_ONLY (events recorded, nothing published — dry runs), KAFKA (live). Required.
+    # Everything below is required unless mode=OFF; ContractConfigCheck refuses to start otherwise.
+    # Kafka consumer settings come from the environment as SPRING_KAFKA_CONSUMER_* (group-id,
+    # bootstrap-servers, key/value deserializers, auto-offset-reset) so a mode=OFF deployment carries
+    # no consumer configuration at all.
+    mode: ${AR_CONTRACT_MODE}
+    producer-name: ${AR_CONTRACT_PRODUCER_NAME:}
+    topics:
+      invoice-command: ${AR_CONTRACT_TOPIC_INVOICE_COMMAND:}
+      debtor-command: ${AR_CONTRACT_TOPIC_DEBTOR_COMMAND:}
+      invoice-event: ${AR_CONTRACT_TOPIC_INVOICE_EVENT:}
+      payment-event: ${AR_CONTRACT_TOPIC_PAYMENT_EVENT:}
+    max-installments: ${AR_CONTRACT_MAX_INSTALLMENTS}
+    max-attempts: ${AR_CONTRACT_MAX_ATTEMPTS}
+    backoff-base-seconds: ${AR_CONTRACT_BACKOFF_BASE_SECONDS}
+    poll-interval-ms: ${AR_CONTRACT_POLL_INTERVAL_MS}
+    # Turns the bank's VA number into the interbank one (bank code + biller id); per deployment.
+    interbank-va-prefix: ${AR_CONTRACT_INTERBANK_VA_PREFIX:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

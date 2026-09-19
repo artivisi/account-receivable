@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Faktur Baru')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('invoices')}"></div>
+<main class="mx-auto max-w-3xl px-4 py-8">
+    <h1 id="page-title" class="mb-6 text-2xl font-semibold text-slate-900">Faktur Baru</h1>
+    <div id="form-error" th:if="${error}" class="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+    <form id="invoice-form" class="card space-y-5 p-6" th:action="@{/admin/invoices}" method="post">
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="label" for="invoice-debtor-search">Debitur</label>
+                <div th:replace="~{fragments :: lookupPicker('invoice-debtor', 'debtorCode', @{/admin/debtors/lookup}, 'Cari kode / nama debitur…', null, null)}"></div>
+            </div>
+            <div>
+                <label class="label" for="invoice-type-search">Tipe Faktur</label>
+                <div th:replace="~{fragments :: lookupPicker('invoice-type', 'invoiceTypeCode', @{/admin/invoice-types/lookup}, 'Cari kode / nama tipe…', null, null)}"></div>
+            </div>
+            <div>
+                <label class="label" for="invoice-issue-date">Tanggal Terbit</label>
+                <input id="invoice-issue-date" class="input" type="date" name="issueDate" th:value="${today}" required/>
+            </div>
+            <div>
+                <label class="label" for="invoice-due-date">Jatuh Tempo</label>
+                <input id="invoice-due-date" class="input" type="date" name="dueDate" th:value="${today}" required/>
+            </div>
+        </div>
+        <div>
+            <label class="label" for="invoice-description">Keterangan</label>
+            <input id="invoice-description" class="input" name="description"/>
+        </div>
+
+        <div>
+            <div class="label">Rincian Baris (baris kosong diabaikan; nilai = jumlah baris)</div>
+            <div id="invoice-lines" class="space-y-2">
+                <div class="grid grid-cols-12 gap-2" th:each="i : ${#numbers.sequence(1,5)}">
+                    <input th:id="'line-description-' + ${i}" class="input col-span-6" name="lineDescription" placeholder="Deskripsi"/>
+                    <input th:id="'line-quantity-' + ${i}" class="input col-span-3" name="lineQuantity" placeholder="Qty"/>
+                    <input th:id="'line-unit-amount-' + ${i}" class="input col-span-3" name="lineUnitAmount" placeholder="Harga satuan"/>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="mb-2 flex items-center gap-2">
+                <input type="checkbox" name="installment" value="true" id="installment"/>
+                <label class="text-sm font-medium text-slate-700" for="installment">Jadwal cicilan (harus sama dengan nilai faktur)</label>
+            </div>
+            <div id="invoice-installments" class="space-y-2">
+                <div class="grid grid-cols-12 gap-2" th:each="i : ${#numbers.sequence(1,6)}">
+                    <input th:id="'installment-due-date-' + ${i}" class="input col-span-6" type="date" name="installmentDueDate"/>
+                    <input th:id="'installment-amount-' + ${i}" class="input col-span-6" name="installmentAmount" placeholder="Nilai"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-2">
+            <button id="btn-issue-invoice" class="btn-primary" type="submit">Terbitkan</button>
+            <a id="btn-cancel" class="btn-ghost" th:href="@{/admin/invoices}">Batal</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

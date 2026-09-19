@@ -1,0 +1,10 @@
+{
+  "type": "charge.openRequested",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a30",
+  "occurredAt": "2026-09-10T09:15:00+07:00",
+  "producer": "spmb",
+  "payload": {
+    "idempotencyKey": "spmb:buka-va:2600000001:2",
+    "invoiceNumber": "2026082740999002"
+  }
+}

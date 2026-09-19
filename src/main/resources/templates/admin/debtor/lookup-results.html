@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- HTMX fragment: rows of matching debtors swapped into a debtorPicker's results container.
+     Each option carries data-code/data-label; /js/debtor-picker.js handles the click. -->
+<th:block th:fragment="results">
+    <button type="button" th:each="d : ${debtors}" data-picker-option
+            th:id="'debtor-option-' + ${d.code}"
+            th:attr="data-code=${d.code}, data-label=${d.code} + ' · ' + ${d.name}"
+            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
+        <span class="font-mono text-slate-500" th:text="${d.code}">CODE</span>
+        <span class="truncate" th:text="${d.name}">Name</span>
+        <span th:if="${d.status.name() != 'ACTIVE'}" class="badge-muted ml-auto shrink-0">NONAKTIF</span>
+    </button>
+    <div th:if="${debtors.isEmpty()}" class="px-3 py-2 text-sm text-slate-400">Tidak ada debitur.</div>
+</th:block>
+</body>
+</html>

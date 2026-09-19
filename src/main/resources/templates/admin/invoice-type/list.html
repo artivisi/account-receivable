@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Tipe Faktur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('types')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8">
+    <div class="page-header">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Tipe Faktur</h1>
+        <a id="btn-new-type" th:href="@{/admin/invoice-types/new}" class="btn-primary">+ Tipe Baru</a>
+    </div>
+    <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+    <div class="card">
+        <div class="table-wrap">
+        <table id="invoice-type-table" class="data-table">
+            <thead class="bg-slate-50">
+            <tr><th class="th">Kode</th><th class="th">Nama</th><th class="th">Aktif</th><th class="th"></th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="t : ${types}" th:id="'type-row-' + ${t.code}">
+                <td class="td font-mono" th:text="${t.code}"></td>
+                <td class="td" th:text="${t.name}"></td>
+                <td class="td"><span th:class="${t.active} ? 'badge-ok' : 'badge-muted'" th:text="${t.active} ? 'AKTIF' : 'NONAKTIF'"></span></td>
+                <td class="td"><a class="text-primary-700 hover:underline" th:id="'edit-type-' + ${t.code}" th:href="@{/admin/invoice-types/{id}/edit(id=${t.id})}">Ubah</a></td>
+            </tr>
+            <tr th:if="${types.isEmpty()}"><td id="type-empty" class="td text-slate-400" colspan="5">Belum ada tipe faktur.</td></tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

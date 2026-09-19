@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Faktur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('invoices')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8">
+    <!-- Arriving from the provision report shows a SUBSET; say so, or a filtered total reads as the book. -->
+    <div th:if="${bucket}" id="bucket-filter-banner"
+         class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm">
+        <span>Disaring dari laporan penyisihan — kelompok umur
+            <strong th:text="${bucket}"></strong><span th:if="${type}"> · jenis <strong th:text="${type}"></strong></span></span>
+        <a class="text-primary-700 hover:underline"
+           th:href="@{/admin/invoices(status=${status}, type=${type}, q=${q})}">Hapus saringan umur</a>
+    </div>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Faktur</h1>
+        <div class="flex gap-2">
+            <a id="btn-bulk-upload" th:href="@{/admin/bulk-uploads}" class="btn-ghost">Unggah Massal</a>
+            <a id="btn-new-invoice" th:href="@{/admin/invoices/new}" class="btn-primary">+ Faktur Baru</a>
+        </div>
+    </div>
+    <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+
+    <div class="mb-4 flex flex-wrap gap-2">
+        <a id="tab-status-all" class="rounded-full px-3 py-1.5 text-sm font-medium transition"
+           th:classappend="${status == null or status == ''} ? 'bg-primary-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+           th:href="@{/admin/invoices(type=${type},q=${q})}">Semua</a>
+        <a id="tab-status-open" class="rounded-full px-3 py-1.5 text-sm font-medium transition"
+           th:classappend="${status == 'OPEN'} ? 'bg-primary-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+           th:href="@{/admin/invoices(status='OPEN',type=${type},q=${q})}">Open</a>
+        <a id="tab-status-partial" class="rounded-full px-3 py-1.5 text-sm font-medium transition"
+           th:classappend="${status == 'PARTIALLY_PAID'} ? 'bg-primary-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+           th:href="@{/admin/invoices(status='PARTIALLY_PAID',type=${type},q=${q})}">Sebagian</a>
+        <a id="tab-status-paid" class="rounded-full px-3 py-1.5 text-sm font-medium transition"
+           th:classappend="${status == 'PAID'} ? 'bg-primary-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+           th:href="@{/admin/invoices(status='PAID',type=${type},q=${q})}">Lunas</a>
+        <a id="tab-status-writtenoff" class="rounded-full px-3 py-1.5 text-sm font-medium transition"
+           th:classappend="${status == 'WRITTEN_OFF'} ? 'bg-primary-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+           th:href="@{/admin/invoices(status='WRITTEN_OFF',type=${type},q=${q})}">Write-off</a>
+        <a id="tab-status-menunggak" class="rounded-full px-3 py-1.5 text-sm font-medium transition"
+           th:classappend="${status == 'MENUNGGAK'} ? 'bg-primary-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+           th:href="@{/admin/invoices(status='MENUNGGAK',type=${type},q=${q})}">Menunggak</a>
+    </div>
+
+    <form id="search-form" method="get" th:action="@{/admin/invoices}" class="mb-4 flex flex-wrap items-center gap-3">
+        <input type="hidden" name="status" th:value="${status}"/>
+        <input type="hidden" name="bucket" th:value="${bucket}"/>
+        <input id="invoice-search" class="input max-w-xs" type="text" name="q"
+               placeholder="Cari nomor faktur / kode debitur" th:value="${q}"/>
+        <select id="filter-type" class="input max-w-[220px]" name="type" onchange="this.form.submit()">
+            <option value="">Semua tipe</option>
+            <option th:each="t : ${types}" th:value="${t.code}" th:text="${t.code} + ' · ' + ${t.name}"
+                    th:selected="${t.code == type}"></option>
+        </select>
+        <button id="btn-search" type="submit" class="btn-ghost">Cari</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+        <table id="invoice-table" class="data-table">
+            <thead class="bg-slate-50">
+            <tr><th class="th">Nomor</th><th class="th">Debitur</th><th class="th">Tipe</th><th class="th">Jatuh Tempo</th>
+                <th class="th text-right">Nilai</th><th class="th text-right">Sisa</th><th class="th">Status</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="inv : ${invoices}" th:id="'invoice-row-' + ${inv.invoiceNumber}">
+                <td class="td"><a class="font-mono text-primary-700 hover:underline" th:id="'invoice-link-' + ${inv.invoiceNumber}"
+                                  th:href="@{/admin/invoices/{id}(id=${inv.id})}" th:text="${inv.invoiceNumber}"></a></td>
+                <td class="td font-mono" th:text="${inv.debtorCode}"></td>
+                <td class="td font-mono" th:text="${inv.invoiceTypeCode}"></td>
+                <td class="td font-mono" th:text="${inv.dueDate}"></td>
+                <td class="td text-right font-mono" th:text="${@money.amount(inv.amount)}"></td>
+                <td class="td text-right font-mono" th:text="${@money.amount(inv.outstanding)}"></td>
+                <td class="td whitespace-nowrap">
+                    <span th:switch="${inv.paymentStatus.name()}">
+                        <span th:case="'OPEN'" class="badge-info">OPEN</span>
+                        <span th:case="'PARTIALLY_PAID'" class="badge-warn">SEBAGIAN</span>
+                        <span th:case="'PAID'" class="badge-ok">LUNAS</span>
+                        <span th:case="'WRITTEN_OFF'" class="badge-muted">WRITE-OFF</span>
+                    </span>
+                    <span th:if="${inv.overdue(today)}" class="badge-danger ml-1"
+                          th:text="'MENUNGGAK ' + ${inv.daysOverdue(today)} + ' HR'"></span>
+                </td>
+            </tr>
+            <tr th:if="${invoices.isEmpty()}"><td id="invoice-empty" class="td text-slate-400" colspan="7">Tidak ada faktur yang sesuai.</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-600">
+            <span id="pagination-info">Menampilkan
+                <span th:text="${pageInfo.totalElements == 0 ? 0 : pageInfo.number * pageInfo.size + 1}"></span>&ndash;<span
+                th:text="${pageInfo.number * pageInfo.size + pageInfo.numberOfElements}"></span> dari
+                <span th:text="${pageInfo.totalElements}"></span></span>
+            <div class="flex items-center gap-3">
+                <a th:if="${!pageInfo.first}" id="btn-prev-page" class="btn-ghost px-3 py-1"
+                   th:href="@{/admin/invoices(status=${status},type=${type},q=${q},bucket=${bucket},page=${pageInfo.number - 1})}">&lsaquo; Sebelumnya</a>
+                <span th:if="${pageInfo.first}" id="btn-prev-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">&lsaquo; Sebelumnya</span>
+                <span id="page-indicator" th:text="${pageInfo.number + 1} + ' / ' + ${pageInfo.totalPages == 0 ? 1 : pageInfo.totalPages}"></span>
+                <a th:if="${!pageInfo.last and pageInfo.totalPages > 0}" id="btn-next-page" class="btn-ghost px-3 py-1"
+                   th:href="@{/admin/invoices(status=${status},type=${type},q=${q},bucket=${bucket},page=${pageInfo.number + 1})}">Berikutnya &rsaquo;</a>
+                <span th:if="${pageInfo.last or pageInfo.totalPages == 0}" id="btn-next-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">Berikutnya &rsaquo;</span>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

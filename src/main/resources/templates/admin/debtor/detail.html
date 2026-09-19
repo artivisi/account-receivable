@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Debitur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('debtors')}"></div>
+<main id="debtor-detail-page" class="mx-auto max-w-7xl px-4 py-8 space-y-6">
+
+    <nav class="text-sm text-slate-500">
+        <a th:href="@{/admin/debtors}" class="hover:underline">Debitur</a>
+        / <span id="debtor-breadcrumb-code" th:text="${detail.code}"></span>
+    </nav>
+
+    <div id="debtor-header" class="card flex flex-wrap items-center gap-4 p-6">
+        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-100
+                    text-lg font-semibold text-primary-700"
+             th:text="${#strings.toUpperCase(#strings.substring(detail.name, 0, 1))}">X</div>
+        <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+                <h1 id="debtor-name" class="text-xl font-semibold text-slate-900" th:text="${detail.name}">Nama</h1>
+                <span id="debtor-status" th:class="${detail.status.name() == 'ACTIVE'} ? 'badge-ok' : 'badge-muted'"
+                      th:text="${detail.status.name() == 'ACTIVE'} ? 'AKTIF' : 'NONAKTIF'"></span>
+            </div>
+            <div class="mt-1 text-sm text-slate-500">
+                <span id="debtor-code" class="font-mono" th:text="${detail.code}"></span>
+                <span th:if="${detail.email}"> · <span id="debtor-email" th:text="${detail.email}"></span></span>
+                <span th:if="${detail.phone}"> · <span id="debtor-phone" th:text="${detail.phone}"></span></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="debtor-stats" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div id="debtor-outstanding" class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Outstanding</div>
+            <div class="mt-1 text-2xl font-semibold text-slate-900 font-mono" th:text="${@money.rupiah(detail.outstandingTotal)}">0</div>
+            <div class="mt-1 text-sm text-slate-500">
+                <span th:text="${detail.openInvoiceCount}">0</span> faktur terbuka
+            </div>
+        </div>
+        <div id="debtor-overdue" class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Menunggak</div>
+            <div class="mt-1 text-2xl font-semibold text-[#a33b32] font-mono" th:text="${@money.rupiah(detail.overdueTotal)}">0</div>
+            <div class="mt-1 text-sm text-slate-500">
+                tertua <span th:text="${detail.oldestOverdueDays}">0</span> hari
+            </div>
+        </div>
+        <div id="debtor-total-paid" class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Dibayar (12 Bln)</div>
+            <div class="mt-1 text-2xl font-semibold text-accent-700 font-mono" th:text="${@money.rupiah(detail.totalPaid12Months)}">0</div>
+            <div class="mt-1 text-sm text-slate-500" th:if="${detail.averageDaysToPay != null}">
+                rata-rata <span th:text="${#numbers.formatDecimal(detail.averageDaysToPay, 1, 1)}">0</span> hari bayar
+            </div>
+            <div class="mt-1 text-sm text-slate-400" th:unless="${detail.averageDaysToPay != null}">belum ada pembayaran</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <span class="text-sm font-semibold text-slate-700">Rekening Koran (Statement)</span>
+            <div id="debtor-ledger-tabs" class="flex gap-1 text-sm">
+                <a id="tab-months-6" class="rounded-md px-3 py-1.5 font-medium"
+                   th:classappend="${detail.monthsBack == 6} ? 'bg-primary-600 text-white' : 'text-primary-700 hover:bg-slate-100'"
+                   th:href="@{/admin/debtors/{id}(id=${debtorId}, months=6)}">6 Bulan</a>
+                <a id="tab-months-12" class="rounded-md px-3 py-1.5 font-medium"
+                   th:classappend="${detail.monthsBack == 12} ? 'bg-primary-600 text-white' : 'text-primary-700 hover:bg-slate-100'"
+                   th:href="@{/admin/debtors/{id}(id=${debtorId}, months=12)}">12 Bulan</a>
+                <a id="tab-months-0" class="rounded-md px-3 py-1.5 font-medium"
+                   th:classappend="${detail.monthsBack == 0} ? 'bg-primary-600 text-white' : 'text-primary-700 hover:bg-slate-100'"
+                   th:href="@{/admin/debtors/{id}(id=${debtorId}, months=0)}">Semua</a>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table id="debtor-ledger-table" class="data-table">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="th">Tanggal</th>
+                    <th class="th">Referensi</th>
+                    <th class="th">Keterangan</th>
+                    <th class="th text-right">Debit</th>
+                    <th class="th text-right">Kredit</th>
+                    <th class="th text-right">Saldo</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="e : ${detail.ledger}">
+                    <td class="td font-mono" th:text="${e.date}"></td>
+                    <td class="td font-mono" th:text="${e.reference}"></td>
+                    <td class="td whitespace-normal break-words" th:text="${e.description}"></td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(e.debit)}"></td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(e.credit)}"></td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(e.runningBalance)}"></td>
+                </tr>
+                <tr th:if="${detail.ledger.isEmpty()}">
+                    <td id="debtor-ledger-empty" class="td text-slate-400" colspan="6">Belum ada transaksi.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="px-4 py-3 text-sm font-semibold text-slate-700">Faktur Terbuka</div>
+        <div class="table-wrap">
+            <table id="debtor-open-invoices-table" class="data-table">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="th">Nomor</th>
+                    <th class="th">Tipe</th>
+                    <th class="th">Jatuh Tempo</th>
+                    <th class="th text-right">Sisa</th>
+                    <th class="th">Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="inv : ${detail.openInvoices}" th:id="'open-invoice-row-' + ${inv.invoiceNumber}">
+                    <td class="td">
+                        <a class="font-mono text-primary-700 hover:underline"
+                           th:href="@{/admin/invoices/{id}(id=${inv.id})}" th:text="${inv.invoiceNumber}"></a>
+                    </td>
+                    <td class="td" th:text="${inv.invoiceTypeCode}"></td>
+                    <td class="td font-mono">
+                        <span th:text="${inv.dueDate}"></span>
+                        <span th:if="${inv.overdue}" class="badge-danger ml-2"
+                              th:text="'MENUNGGAK ' + ${inv.overdueDays} + ' HR'"></span>
+                    </td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(inv.outstanding)}"></td>
+                    <td class="td">
+                    <span th:switch="${inv.paymentStatus.name()}">
+                        <span th:case="'OPEN'" class="badge-info">OPEN</span>
+                        <span th:case="'PARTIALLY_PAID'" class="badge-warn">SEBAGIAN</span>
+                        <span th:case="'PAID'" class="badge-ok">LUNAS</span>
+                        <span th:case="'WRITTEN_OFF'" class="badge-muted">WRITE-OFF</span>
+                        <span th:case="*" th:text="${inv.paymentStatus}"></span>
+                    </span>
+                </td>
+            </tr>
+                <tr th:if="${detail.openInvoices.isEmpty()}">
+                    <td id="debtor-open-invoices-empty" class="td text-slate-400" colspan="5">Tidak ada faktur terbuka.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="400" height="400" version="1.1"
+     style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+     viewBox="2881 3856 2500 2500">
+  <defs>
+    <style type="text/css">
+      <![CDATA[
+        .fil0 {fill:#EE7B1D;fill-rule:nonzero}
+        .fil1 {fill:#194189;fill-rule:nonzero}
+      ]]>
+    </style>
+  </defs>
+  <g id="Layer_x0020_1">
+    <g>
+      <polygon class="fil0" points="4131.06,6303.69 3093.79,5704.81 3093.79,5221.41 3440.52,5221.41 3440.52,5504.63 4131.06,5903.31 4821.6,5504.63 4821.6,5221.41 5168.32,5221.41 5168.32,5704.81 "/>
+      <polygon class="fil1" points="3093.79,4990.43 3093.79,4507.05 4131.06,3908.17 5168.32,4507.05 5168.32,4990.43 4821.6,4990.43 4821.6,4707.24 4131.06,4308.55 3440.52,4707.24 3440.52,4990.43 "/>
+      <polygon class="fil1" points="4292.81,5053.65 4506.85,5267.69 4292.81,5481.73 4078.8,5267.69 "/>
+      <polygon class="fil1" points="3969.29,4730.13 4183.32,4944.17 3969.29,5158.2 3755.26,4944.17 "/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Temuan Piutang')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('anomalies')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8">
+    <div class="mb-6">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Temuan Piutang</h1>
+        <p class="mt-1 text-sm text-slate-500">
+            Kesalahan pada piutang yang hanya terlihat dari luar buku ini: laporan transaksi bank,
+            rekonsiliasi rekening, atau pemeriksaan yang membandingkan dua sistem. Setiap baris menunggu
+            keputusan, dan keputusan tersebut tercatat beserta nama pengambil keputusannya.
+        </p>
+    </div>
+
+    <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+    <div id="flash-error" th:if="${error}" class="mb-4 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <!-- Nominal, waktu, dan nomor VA diambil dari temuan. Salah ketik pada uang yang sudah diterima
+         bank tetap seimbang terhadap dirinya sendiri, sehingga tidak ada pemeriksaan di buku ini yang
+         bisa menangkapnya. Karena itu operator hanya mengonfirmasi, tanpa mengetik angka. -->
+    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <strong>Catat pembayaran</strong> membukukan uang yang sudah diterima bank: sisa faktur berkurang,
+        aplikasi kas tercatat dengan referensi bank, dan aplikasi penagih menerima kabar pembayaran.
+        Debitur tidak menerima email tanda terima. Nominal, waktu, dan nomor VA diambil dari temuan,
+        jadi cocokkan dulu referensinya dengan laporan bank.
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <table id="anomaly-table" class="w-full text-sm">
+            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+                <th class="th">Faktur</th>
+                <th class="th">Debitur</th>
+                <th class="th text-right">Sisa</th>
+                <th class="th">Temuan</th>
+                <th class="th">Bukti Bank</th>
+                <th class="th">Keputusan</th>
+            </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            <tr th:each="row : ${rows}" th:id="'anomaly-row-' + ${row.id}" class="align-top">
+                <td class="td">
+                    <a class="text-primary-700 hover:underline" th:id="'anomaly-invoice-' + ${row.id}"
+                       th:href="@{/admin/invoices/{id}(id=${row.invoiceId})}"
+                       th:text="${row.invoiceNumber}"></a>
+                    <div th:if="${row.sourceBillNumber != null and row.sourceBillNumber != row.invoiceNumber}"
+                         class="font-mono text-xs text-slate-400" th:text="${row.sourceBillNumber}"></div>
+                    <div class="text-xs text-slate-400" th:id="'anomaly-invoice-status-' + ${row.id}"
+                         th:text="${row.invoiceStatus}"></div>
+                </td>
+                <td class="td">
+                    <span th:text="${row.debtorName}"></span>
+                    <div class="text-xs text-slate-400" th:text="${row.debtorCode}"></div>
+                </td>
+                <td class="td text-right font-mono" th:text="${@money.rupiah(row.outstanding)}"></td>
+
+                <td class="td">
+                    <span th:switch="${row.category}" th:remove="tag">
+                        <span th:case="'BANK_PAID_NOT_BOOKED'" th:id="'category-' + ${row.id}"
+                              class="inline-block rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800">Diterima bank, belum dibukukan</span>
+                        <span th:case="'NOTIFIED_NOT_SETTLED'" th:id="'category-' + ${row.id}"
+                              class="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Tercatat lunas, dana belum masuk</span>
+                        <span th:case="*" th:id="'category-' + ${row.id}"
+                              class="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600"
+                              th:text="${row.category}"></span>
+                    </span>
+                    <div class="mt-1 text-xs text-slate-600" th:id="'anomaly-detail-' + ${row.id}" th:text="${row.detail}"></div>
+                    <div class="mt-1 text-xs text-slate-400"
+                         th:text="'Dilaporkan ' + ${row.raisedBy} + ' (' + ${row.source} + '), menunggu ' + ${row.daysOpen} + ' hari'"></div>
+                </td>
+
+                <td class="td">
+                    <div th:if="${row.evidenceRef}" th:id="'evidence-ref-' + ${row.id}"
+                         class="font-mono text-xs" th:text="${row.evidenceRef}"></div>
+                    <div th:if="${row.evidenceAmount}" th:id="'evidence-amount-' + ${row.id}"
+                         class="font-mono text-xs" th:text="${@money.rupiah(row.evidenceAmount)}"></div>
+                    <div th:if="${row.evidenceAt}" class="text-xs text-slate-500"
+                         th:text="${#temporals.format(row.evidenceAt, 'dd MMM yyyy HH:mm')}"></div>
+                    <div th:if="${row.evidenceVaNumber}" class="font-mono text-xs text-slate-500"
+                         th:text="'VA ' + ${row.evidenceVaNumber}"></div>
+                    <div th:if="${row.evidenceBank}" class="text-xs text-slate-500"
+                         th:text="'Bank ' + ${row.evidenceBank}"></div>
+                </td>
+
+                <td class="td">
+                    <div class="flex flex-col gap-2">
+                        <form th:if="${row.bookable}" method="post" class="flex items-center gap-1"
+                              th:action="@{/admin/anomalies/{id}/book-payment(id=${row.id})}"
+                              onsubmit="return confirm('Catat pembayaran ini ke faktur? Sisa faktur berkurang dan aplikasi penagih diberi tahu.');">
+                            <input th:id="'input-book-note-' + ${row.id}" name="note" required maxlength="400"
+                                   placeholder="Dicocokkan dengan laporan bank"
+                                   class="w-44 rounded-md border border-slate-300 px-2 py-1 text-xs">
+                            <button th:id="'btn-book-' + ${row.id}" class="btn-primary px-2 py-1 text-xs"
+                                    type="submit">Catat pembayaran</button>
+                        </form>
+                        <div th:if="${row.notBookableReason}" th:id="'not-bookable-' + ${row.id}"
+                             class="text-xs text-slate-500"
+                             th:text="'Belum bisa dicatat: ' + ${row.notBookableReason}"></div>
+
+                        <form method="post" class="flex flex-wrap items-center gap-1"
+                              th:action="@{/admin/anomalies/{id}/resolve(id=${row.id})}">
+                            <select th:id="'select-resolution-' + ${row.id}" name="resolution" required
+                                    class="rounded-md border border-slate-300 px-2 py-1 text-xs">
+                                <option value="" disabled selected>Pilih keputusan</option>
+                                <option th:each="r : ${resolutions}" th:value="${r.key}" th:text="${r.value}"></option>
+                            </select>
+                            <input th:id="'input-resolve-note-' + ${row.id}" name="note" required maxlength="400"
+                                   placeholder="Alasan keputusan"
+                                   class="w-44 rounded-md border border-slate-300 px-2 py-1 text-xs">
+                            <button th:id="'btn-resolve-' + ${row.id}" class="btn-ghost px-2 py-1 text-xs"
+                                    type="submit">Tutup temuan</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            <tr th:if="${rows.isEmpty()}">
+                <td class="td text-slate-500" colspan="6">Tidak ada temuan yang menunggu keputusan.</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between text-sm text-slate-500">
+        <span>Total <span id="anomaly-total" th:text="${total}"></span> temuan</span>
+        <div class="flex items-center gap-2">
+            <a th:if="${!pageInfo.first}" id="btn-prev-page" class="btn-ghost px-3 py-1"
+               th:href="@{/admin/anomalies(page=${pageInfo.number - 1})}">&lsaquo; Sebelumnya</a>
+            <a th:if="${!pageInfo.last and pageInfo.totalPages > 0}" id="btn-next-page" class="btn-ghost px-3 py-1"
+               th:href="@{/admin/anomalies(page=${pageInfo.number + 1})}">Berikutnya &rsaquo;</a>
+        </div>
+    </div>
+
+    <p class="mt-6 text-xs text-slate-400">
+        Temuan masuk dari pemeriksaan di luar AR, misalnya rekonsiliasi laporan transaksi bank. Temuan
+        yang sudah diputuskan tetap tersimpan beserta keputusan, catatan, dan nama pengambil keputusannya, sehingga
+        debitur yang pembayarannya berulang kali tertinggal dapat dikenali.
+    </p>
+</main>
+</body>
+</html>

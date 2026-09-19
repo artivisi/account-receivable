@@ -1,0 +1,49 @@
+{
+  "type": "invoice.planAmended",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a10",
+  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "correlationId": "aplikasi-akademik:ukt-jadwal:2600000001:20262:r1",
+    "invoiceNumber": "2026082740999001",
+    "debtorCode": "2600000001",
+    "amount": "6500000.00",
+    "cumulativePaid": "2166667.00",
+    "outstanding": "4333333.00",
+    "paymentPlan": [
+      {
+        "sequence": 1,
+        "dueDate": "2026-09-10",
+        "amount": "2166667.00",
+        "status": "PAID"
+      },
+      {
+        "sequence": 2,
+        "dueDate": "2026-11-10",
+        "amount": "1083333.00",
+        "status": "OPEN"
+      },
+      {
+        "sequence": 3,
+        "dueDate": "2026-12-10",
+        "amount": "1083333.00",
+        "status": "OPEN"
+      },
+      {
+        "sequence": 4,
+        "dueDate": "2027-01-10",
+        "amount": "1083333.00",
+        "status": "OPEN"
+      },
+      {
+        "sequence": 5,
+        "dueDate": "2027-02-10",
+        "amount": "1083334.00",
+        "status": "OPEN"
+      }
+    ],
+    "reason": "Permohonan mahasiswa disetujui, sisa dibagi empat",
+    "decidedBy": "aplikasi-akademik",
+    "decidedAt": "2026-10-20T09:15:00+07:00"
+  }
+}

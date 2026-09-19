@@ -1,0 +1,20 @@
+{
+  "type": "payment.received",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a20",
+  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "invoiceNumber": "INV000995",
+    "sourceInvoiceNumber": "2026082740999140",
+    "debtorCode": "2600000001",
+    "vaNumber": "402600000001",
+    "currency": "IDR",
+    "amount": "2166667.00",
+    "cumulativePaid": "2166667.00",
+    "outstanding": "4333333.00",
+    "bank": "bsi",
+    "reference": "202608271536320002",
+    "paidAt": "2026-08-27T15:36:32+07:00",
+    "invoiceStatus": "PARTIALLY_PAID"
+  }
+}

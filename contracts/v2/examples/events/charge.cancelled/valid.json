@@ -1,0 +1,11 @@
+{
+  "type": "charge.cancelled",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a10",
+  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "invoiceNumber": "2026082740999001",
+    "vaNumber": "402600000001",
+    "reason": "INVOICE_CANCELLED"
+  }
+}

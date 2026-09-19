@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Aplikasi Kas')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('cash-applications')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Aplikasi Kas</h1>
+            <p id="page-subtitle" class="mt-1 text-sm text-slate-500">Pembayaran gateway → alokasi ke faktur / cicilan · idempoten per referensi</p>
+        </div>
+        <button id="btn-export-csv" type="button" class="btn-ghost">Ekspor CSV</button>
+    </div>
+
+    <div id="unapplied-banner" th:if="${unappliedCount > 0}"
+         class="flex items-center justify-between rounded-lg border border-[#e7c2be] bg-[#fbf1f0] px-4 py-3 text-sm text-[#a33b32]">
+        <span th:text="${unappliedCount} + ' pembayaran belum teralokasi (UNAPPLIED).'"></span>
+        <a id="btn-review-unapplied" class="btn-danger" th:href="@{/admin/cash-applications(status='UNAPPLIED')}">Tinjau</a>
+    </div>
+
+    <!-- Selisih ini tidak bisa dilihat dari tabel di bawah: semua barisnya APPLIED dan benar. Yang
+         salah ada di aplikasi penagih, jadi satu-satunya cara memunculkannya adalah spanduk ini. -->
+    <div id="upstream-missing-banner" th:if="${upstreamMissingCount > 0}"
+         class="flex items-center justify-between rounded-lg border border-[#e7c2be] bg-[#fbf1f0] px-4 py-3 text-sm text-[#a33b32]">
+        <span th:text="${upstreamMissingCount} + ' pembayaran sudah diterima di sini tetapi belum tercatat di aplikasi penagih — debitur yang membayar masih tampak menunggak di sana.'"></span>
+        <a id="btn-review-upstream-missing" class="btn-danger"
+           th:href="@{/admin/cash-applications/upstream-missing}">Tinjau</a>
+    </div>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table id="cash-application-table" class="data-table">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="th">Ref Pembayaran</th>
+                    <th class="th">Diterima</th>
+                    <th class="th">Debitur</th>
+                    <th class="th text-right">Jumlah</th>
+                    <th class="th">Alokasi</th>
+                    <th class="th">Via</th>
+                    <th class="th">Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="a : ${cashApplications}" th:id="'cash-application-row-' + ${a.gatewayPaymentReference}">
+                    <td class="td font-mono" th:text="${a.gatewayPaymentReference}"></td>
+                    <td class="td font-mono" th:text="${#temporals.format(a.receivedAt, 'dd MMM yyyy HH:mm')}"></td>
+                    <td class="td" th:text="${a.debtorName} ?: '—'"></td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(a.amount)}"></td>
+                    <td class="td">
+                        <th:block th:each="al, st : ${a.allocations}"><a
+                            class="font-mono text-primary-700 hover:underline"
+                            th:id="'cash-application-allocation-' + ${a.gatewayPaymentReference} + '-' + ${st.index}"
+                            th:href="@{/admin/invoices/{id}(id=${al.invoiceId})}"
+                            th:text="${al.label}"></a><span th:if="${!st.last}">, </span></th:block>
+                        <span th:if="${a.allocations.isEmpty()}" class="text-slate-400">— tanpa alokasi —</span>
+                    </td>
+                    <td class="td font-mono" th:text="${a.vaNumber} ?: '—'"></td>
+                    <td class="td">
+                        <span th:if="${a.status.name() == 'APPLIED'}" class="badge-ok">APPLIED</span>
+                        <span th:if="${a.status.name() == 'UNAPPLIED'}" class="badge-danger">UNAPPLIED</span>
+                        <span th:if="${a.status.name() == 'PARTIALLY_APPLIED'}" class="badge-warn">SEBAGIAN</span>
+                        <span th:if="${a.status.name() == 'REVERSED'}" class="badge-muted">REVERSED</span>
+                    </td>
+                </tr>
+                <tr th:if="${cashApplications.isEmpty()}"><td id="cash-application-empty" class="td text-slate-400" colspan="7">Belum ada aplikasi kas.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-600">
+            <span id="pagination-info">Menampilkan
+                <span th:text="${pageInfo.totalElements == 0 ? 0 : pageInfo.number * pageInfo.size + 1}">0</span>&ndash;<span
+                th:text="${pageInfo.number * pageInfo.size + pageInfo.numberOfElements}">0</span> dari
+                <span th:text="${pageInfo.totalElements}">0</span></span>
+            <div class="flex items-center gap-3">
+                <a th:if="${!pageInfo.first and statusFilter != null}" id="btn-prev-page" class="btn-ghost px-3 py-1"
+                   th:href="@{/admin/cash-applications(status=${statusFilter}, page=${pageInfo.number - 1})}">&lsaquo; Sebelumnya</a>
+                <a th:if="${!pageInfo.first and statusFilter == null}" id="btn-prev-page" class="btn-ghost px-3 py-1"
+                   th:href="@{/admin/cash-applications(page=${pageInfo.number - 1})}">&lsaquo; Sebelumnya</a>
+                <span th:if="${pageInfo.first}" id="btn-prev-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">&lsaquo; Sebelumnya</span>
+                <span id="page-indicator" th:text="${pageInfo.number + 1} + ' / ' + ${pageInfo.totalPages == 0 ? 1 : pageInfo.totalPages}">1 / 1</span>
+                <a th:if="${!pageInfo.last and pageInfo.totalPages > 0 and statusFilter != null}" id="btn-next-page" class="btn-ghost px-3 py-1"
+                   th:href="@{/admin/cash-applications(status=${statusFilter}, page=${pageInfo.number + 1})}">Berikutnya &rsaquo;</a>
+                <a th:if="${!pageInfo.last and pageInfo.totalPages > 0 and statusFilter == null}" id="btn-next-page" class="btn-ghost px-3 py-1"
+                   th:href="@{/admin/cash-applications(page=${pageInfo.number + 1})}">Berikutnya &rsaquo;</a>
+                <span th:if="${pageInfo.last or pageInfo.totalPages == 0}" id="btn-next-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">Berikutnya &rsaquo;</span>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

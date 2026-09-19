@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Dashboard')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('dashboard')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8">
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Dashboard Umur Piutang</h1>
+            <p class="mt-1 text-sm text-slate-500">
+                Posisi per
+                <span id="dashboard-as-of" class="font-mono"
+                      th:text="${#temporals.format(summary.asOf, 'EEEE, d MMMM yyyy', new java.util.Locale('id', 'ID'))}">tanggal</span>
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="btn-export-csv" type="button" class="btn-ghost">Ekspor CSV</button>
+            <a id="btn-new-invoice" th:href="@{/admin/invoices/new}" class="btn-primary">+ Faktur Baru</a>
+        </div>
+    </div>
+
+    <!-- Temuan dari luar AR membuat angka di bawah tetap terlihat wajar, jadi jumlahnya diumumkan di
+         halaman pertama yang dibuka bagian keuangan. -->
+    <div id="anomaly-banner" th:if="${openAnomalyCount > 0}"
+         class="mb-6 flex items-center justify-between rounded-lg border border-[#e7c2be] bg-[#fbf1f0] px-4 py-3 text-sm text-[#a33b32]">
+        <span id="anomaly-banner-text"
+              th:text="${openAnomalyCount} + ' temuan piutang dari luar AR menunggu keputusan.'"></span>
+        <a id="btn-review-anomalies" class="btn-danger" th:href="@{/admin/anomalies}">Tinjau</a>
+    </div>
+
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div id="stat-total-outstanding" class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Outstanding</div>
+            <div class="mt-1 font-mono text-2xl font-semibold text-slate-900"
+                 th:text="${@money.rupiah(summary.aging.totalOutstanding)}">0</div>
+        </div>
+        <div id="stat-overdue" class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Menunggak (Overdue)</div>
+            <div class="mt-1 font-mono text-2xl font-semibold text-[#a33b32]" th:text="${@money.rupiah(summary.overdueTotal)}">0</div>
+            <div class="mt-1 text-sm text-slate-500">
+                <span class="font-mono" th:text="${summary.overdueCount}">0</span> faktur lewat jatuh tempo
+            </div>
+        </div>
+        <div id="stat-received-month" class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Diterima Bulan Ini</div>
+            <div class="mt-1 font-mono text-2xl font-semibold text-[#2f7d4f]"
+                 th:text="${@money.rupiah(summary.receivedThisMonthTotal)}">0</div>
+            <div class="mt-1 text-sm text-slate-500">
+                <span class="font-mono" th:text="${summary.receivedThisMonthCount}">0</span> aplikasi kas ·
+                <span class="font-mono" th:text="${summary.unappliedThisMonthCount}">0</span> unapplied
+            </div>
+        </div>
+        <div id="stat-dso" class="stat-card">
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">DSO (Rata-rata)</div>
+            <div class="mt-1 font-mono text-2xl font-semibold text-slate-900">
+                <span th:text="${summary.dso}">0</span> hari
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-6 p-5">
+        <div class="mb-3 text-sm font-medium text-slate-700">Sebaran Umur Piutang</div>
+        <div id="aging-bucket-bar" class="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
+            <div th:each="b : ${summary.aging.buckets}"
+                 th:id="'aging-bar-' + ${b.bucket}"
+                 th:style="'flex-grow: ' + ${b.amount} + '; flex-basis: 0;'"
+                 th:classappend="${b.bucket.name() == 'CURRENT'} ? 'bg-[#3a6b99]' :
+                                  (${b.bucket.name() == 'DUE_1_30'} ? 'bg-[#c9a13b]' :
+                                  (${b.bucket.name() == 'DUE_31_60'} ? 'bg-[#c2703d]' :
+                                  (${b.bucket.name() == 'DUE_61_90'} ? 'bg-[#a33b32]' : 'bg-[#6e2620]')))"></div>
+        </div>
+        <div id="aging-bucket-legend" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-5">
+            <div th:each="b : ${summary.aging.buckets}" th:id="'aging-bucket-' + ${b.bucket}">
+                <div class="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <span class="h-2.5 w-2.5 shrink-0 rounded-full"
+                          th:classappend="${b.bucket.name() == 'CURRENT'} ? 'bg-[#3a6b99]' :
+                                           (${b.bucket.name() == 'DUE_1_30'} ? 'bg-[#c9a13b]' :
+                                           (${b.bucket.name() == 'DUE_31_60'} ? 'bg-[#c2703d]' :
+                                           (${b.bucket.name() == 'DUE_61_90'} ? 'bg-[#a33b32]' : 'bg-[#6e2620]')))"></span>
+                    <span th:switch="${b.bucket.name()}">
+                        <span th:case="'CURRENT'">Belum jatuh tempo</span>
+                        <span th:case="'DUE_1_30'">1&ndash;30 hari</span>
+                        <span th:case="'DUE_31_60'">31&ndash;60 hari</span>
+                        <span th:case="'DUE_61_90'">61&ndash;90 hari</span>
+                        <span th:case="*">&gt;90 hari</span>
+                    </span>
+                </div>
+                <div class="mt-1 font-mono text-lg font-semibold text-slate-900" th:text="${@money.amount(b.amount)}">0</div>
+                <div class="text-xs text-slate-500"><span class="font-mono" th:text="${b.count}">0</span> faktur</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="card overflow-hidden">
+            <div class="border-b border-slate-100 px-5 py-4 text-sm font-semibold text-slate-700">Tunggakan Terbesar</div>
+            <div class="table-wrap">
+            <table id="dashboard-top-overdue" class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                <tr>
+                    <th class="th">Faktur</th>
+                    <th class="th">Debitur</th>
+                    <th class="th text-right">Sisa</th>
+                    <th class="th text-right">Telat</th>
+                </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                <tr th:each="e : ${summary.topOverdue}" th:id="'top-overdue-row-' + ${e.invoiceId}">
+                    <td class="td">
+                        <a class="font-mono text-primary-700 hover:underline"
+                           th:href="@{/admin/invoices/{id}(id=${e.invoiceId})}" th:text="${e.invoiceNumber}"></a>
+                    </td>
+                    <td class="td" th:text="${e.debtorName}"></td>
+                    <td class="td text-right font-mono" th:text="${@money.amount(e.outstanding)}"></td>
+                    <td class="td text-right font-mono font-bold text-[#a33b32]"
+                        th:text="${e.daysOverdue} + ' hr'"></td>
+                </tr>
+                <tr th:if="${summary.topOverdue.isEmpty()}">
+                    <td id="top-overdue-empty" class="td text-slate-400" colspan="4">Tidak ada tunggakan.</td>
+                </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="card p-5">
+            <div class="mb-4 text-sm font-semibold text-slate-700">Aktivitas Terakhir</div>
+            <div id="dashboard-recent-activity" class="space-y-4">
+                <div th:each="a : ${summary.recentActivity}" class="flex items-start gap-3">
+                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary-600"></span>
+                    <div class="min-w-0">
+                        <p class="text-sm text-slate-700" th:text="${a.detail}">detail</p>
+                        <p class="mt-0.5 text-xs text-slate-400">
+                            <span th:text="${a.actor}">actor</span> ·
+                            <span class="font-mono" th:text="${#temporals.format(a.createdAt, 'dd/MM HH:mm')}">tanggal</span>
+                        </p>
+                    </div>
+                </div>
+                <p id="recent-activity-empty" th:if="${summary.recentActivity.isEmpty()}" class="text-sm text-slate-400">
+                    Belum ada aktivitas.
+                </p>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

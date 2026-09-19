@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Faktur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('invoices')}"></div>
+<main class="mx-auto max-w-6xl px-4 py-8 space-y-6">
+    <div id="flash-msg" th:if="${msg}" class="rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+    <div id="flash-error" th:if="${error}" class="rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <h1 id="invoice-number" class="text-2xl font-semibold text-slate-900 font-mono" th:text="${invoice.invoiceNumber}">INV</h1>
+        <div class="flex items-center gap-2">
+            <span id="invoice-status" th:switch="${invoice.paymentStatus.name()}">
+                <span th:case="'OPEN'" class="badge-info">OPEN</span>
+                <span th:case="'PARTIALLY_PAID'" class="badge-warn">SEBAGIAN</span>
+                <span th:case="'PAID'" class="badge-ok">LUNAS</span>
+                <span th:case="'WRITTEN_OFF'" class="badge-muted">WRITE-OFF</span>
+            </span>
+            <span th:if="${invoice.overdue}" class="badge-danger" th:text="'MENUNGGAK ' + ${daysOverdue} + ' HR'"></span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div class="space-y-6 lg:col-span-2">
+            <div id="invoice-summary" class="card grid grid-cols-2 gap-4 p-6 sm:grid-cols-4">
+                <div><div class="label">Debitur</div><div id="invoice-debtor" class="font-mono text-sm text-slate-800" th:text="${invoice.debtorCode}"></div></div>
+                <div><div class="label">Tipe</div><div id="invoice-type" class="font-mono text-sm text-slate-800" th:text="${invoice.invoiceTypeCode}"></div></div>
+                <div><div class="label">Tanggal Terbit</div><div id="invoice-issue-date" class="font-mono text-sm text-slate-800" th:text="${invoice.issueDate}"></div></div>
+                <div><div class="label">Jatuh Tempo</div><div id="invoice-due-date" class="font-mono text-sm text-slate-800" th:text="${invoice.dueDate}"></div></div>
+                <div><div class="label">Nilai</div><div id="invoice-amount" class="font-mono text-sm text-slate-800" th:text="${@money.amount(invoice.amount)}"></div></div>
+                <div><div class="label">Sisa</div><div id="invoice-outstanding" class="font-mono text-sm font-semibold text-primary-700" th:text="${@money.rupiah(invoice.outstanding)}"></div></div>
+                <div><div class="label">Mata Uang</div><div id="invoice-currency" class="font-mono text-sm text-slate-800" th:text="${invoice.currency}"></div></div>
+                <div><div class="label">Menunggak</div><div id="invoice-overdue" class="text-sm text-slate-800" th:text="${invoice.overdue} ? 'Ya' : 'Tidak'"></div></div>
+            </div>
+
+            <!-- Statusnya sendiri sudah berbunyi "OPEN, menunggak" — dan itu terbaca sebagai perintah
+                 menagih. Karena itu peringatannya harus di sini, di layar yang dibuka operator,
+                 bukan hanya di Antrean Hapus Buku yang hanya dibuka orang yang sudah curiga. -->
+            <div th:if="${evidence}" id="unpayable-warning"
+                 class="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                <p class="font-semibold">Piutang ini tidak bisa dibayar.</p>
+                <p class="mt-1">
+                    Statusnya masih terutang, tetapi tidak ada VA aktif untuknya — mengubah jatuh tempo
+                    tidak akan membuatnya bisa dibayar.
+                </p>
+                <p class="mt-2" th:if="${evidence.paidSiblingBill}">
+                    Tagihan <span class="font-mono font-semibold" th:text="${evidence.paidSiblingBill}"></span>
+                    memakai nomor VA yang sama dan <strong>sudah lunas</strong>
+                    (<span th:text="${@money.rupiah(evidence.paidOnSameVaNumber)}"></span>).
+                    Kemungkinan besar utangnya sudah tertagih di tagihan itu —
+                    <strong>cocokkan dulu</strong>, karena nomor VA dipakai ulang antar periode.
+                </p>
+                <p class="mt-2" th:if="${evidence.withdrawnReason}">
+                    Alasan penarikan: <span th:text="${evidence.withdrawnReason}"></span>
+                </p>
+                <p class="mt-2" th:if="${!evidence.everCharged}">
+                    Faktur ini belum pernah punya charge, jadi tidak ada jejak penagihan maupun
+                    pembayaran yang bisa dibandingkan.
+                </p>
+                <p class="mt-2">
+                    Selesaikan lewat <a class="font-semibold underline"
+                       th:href="@{/admin/invoices/write-off-queue}">Antrean Hapus Buku</a> —
+                    tetap tagih, atau hapus buku, keduanya dengan alasan tercatat.
+                </p>
+            </div>
+
+            <!-- Temuan dari luar AR tentang faktur ini. Di buku ini fakturnya terlihat wajar, jadi
+                 peringatannya ditaruh di layar yang dibuka operator. -->
+            <div th:if="${!anomalies.isEmpty()}" id="anomaly-warning"
+                 class="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                <p class="font-semibold">Ada temuan dari luar AR yang belum diputuskan untuk faktur ini.</p>
+                <ul class="mt-2 space-y-1">
+                    <li th:each="f : ${anomalies}" th:id="'anomaly-finding-' + ${f.id}">
+                        <span class="font-mono text-xs" th:text="${f.category} + ':'"></span>
+                        <span th:text="${f.detail}"></span>
+                    </li>
+                </ul>
+                <p class="mt-2">
+                    Putuskan lewat <a id="link-anomalies" class="font-semibold underline"
+                       th:href="@{/admin/anomalies}">Temuan Piutang</a>.
+                </p>
+            </div>
+
+            <!-- Kasus terbalik, dan yang paling perlu diputuskan: sumber bilang tagihannya ditarik,
+                 tetapi VA-nya masih hidup sehingga debitur masih bisa membayar. Tidak masuk
+                 Antrean Hapus Buku — antrean itu untuk yang sudah tidak bisa dibayar, dan menaruh
+                 piutang yang masih tertagih di sana mengundang hapus buku atas utang yang nyata. -->
+            <div th:if="${invoice.withdrawnAt != null and evidence == null and invoice.collectible()}"
+                 id="withdrawn-but-collectible"
+                 class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p class="font-semibold">Sistem penagih menyatakan tagihan ini ditarik, tetapi masih bisa dibayar.</p>
+                <p class="mt-1" th:if="${invoice.withdrawnReason}" th:text="${invoice.withdrawnReason}"></p>
+                <p class="mt-2">
+                    VA-nya masih aktif, jadi debitur masih bisa membayar piutang ini sekarang.
+                    Perlu keputusan: <strong>batalkan penagihannya</strong> bila memang sudah tidak
+                    ditagih, atau <strong>abaikan penarikan itu</strong> bila catatan sumber yang
+                    keliru — keduanya pernah terjadi, jadi jangan diputuskan dari satu sistem saja.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2" th:if="${invoice.collectible()}">
+                <form method="post"
+                      th:action="@{/admin/invoices/{id}/charge(id=${invoice.id})}">
+                    <button id="btn-open-charge" class="btn-ghost" type="submit">Buka Charge</button>
+                </form>
+                <!-- Masa berlaku bersifat lunak: utangnya tidak pernah gugur, jadi pembayar yang
+                     datang terlambat hanya perlu tanggalnya digeser — tidak ada status yang perlu
+                     dipulihkan. Gateway sekaligus mengaktifkan kembali VA yang sudah ditarik.
+                     Urutannya penting bila charge belum ada: ubah tanggal dulu, baru Buka Charge,
+                     karena charge lahir dengan masa berlaku jatuh tempo + 1 hari. -->
+                <form th:unless="${invoice.installment}" method="post"
+                      class="flex flex-wrap items-center gap-2"
+                      th:action="@{/admin/invoices/{id}/due-date(id=${invoice.id})}">
+                    <input id="input-due-date" name="dueDate" type="date" required
+                           th:value="${invoice.dueDate}"
+                           class="rounded-md border border-slate-300 px-3 py-1.5 text-sm">
+                    <button id="btn-amend-due-date" class="btn-ghost" type="submit">Ubah Jatuh Tempo</button>
+                </form>
+                <!-- Hapus buku permanen dan tidak bisa dibatalkan, jadi alasannya wajib: itulah
+                     satu-satunya keterangan yang tersisa bagi siapa pun yang meninjau nanti. -->
+                <form method="post" class="flex flex-wrap items-center gap-2"
+                      th:action="@{/admin/invoices/{id}/write-off(id=${invoice.id})}"
+                      onsubmit="return confirm('Hapus buku faktur ini? Tindakan ini permanen.');">
+                    <input id="input-write-off-reason" name="reason" required maxlength="255"
+                           class="w-72 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                           placeholder="Alasan hapus buku (wajib)">
+                    <button id="btn-write-off" class="btn-danger" type="submit">Write-off</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <div class="px-4 py-3 text-sm font-semibold text-slate-700">Rincian Faktur</div>
+                <div class="table-wrap">
+                <table id="invoice-lines-table" class="data-table">
+                    <thead class="bg-slate-50"><tr><th class="th">#</th><th class="th">Deskripsi</th><th class="th text-right">Qty</th><th class="th text-right">Harga Satuan</th><th class="th text-right">Nilai</th></tr></thead>
+                    <tbody>
+                    <tr th:each="l : ${invoice.lines}">
+                        <td class="td" th:text="${l.lineNo}"></td><td class="td whitespace-normal break-words" th:text="${l.description}"></td>
+                        <td class="td text-right font-mono" th:text="${l.quantity}"></td><td class="td text-right font-mono" th:text="${@money.amount(l.unitAmount)}"></td>
+                        <td class="td text-right font-mono" th:text="${@money.amount(l.lineAmount)}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <div class="card" th:if="${invoice.installment}">
+                <div class="px-4 py-3 text-sm font-semibold text-slate-700">Cicilan</div>
+                <div class="table-wrap">
+                <table id="installments-table" class="data-table">
+                    <thead class="bg-slate-50"><tr><th class="th">#</th><th class="th">Jatuh Tempo</th><th class="th text-right">Nilai</th><th class="th text-right">Sisa</th><th class="th">Status</th><th class="th"></th></tr></thead>
+                    <tbody>
+                    <tr th:each="i : ${invoice.installments}" th:id="'installment-row-' + ${i.sequence}">
+                        <td class="td" th:text="${i.sequence}"></td><td class="td font-mono" th:text="${i.dueDate}"></td>
+                        <td class="td text-right font-mono" th:text="${@money.amount(i.amount)}"></td><td class="td text-right font-mono" th:text="${@money.amount(i.outstanding)}"></td>
+                        <td class="td">
+                            <span th:switch="${i.paymentStatus.name()}">
+                                <span th:case="'OPEN'" class="badge-info">OPEN</span>
+                                <span th:case="'PARTIALLY_PAID'" class="badge-warn">SEBAGIAN</span>
+                                <span th:case="'PAID'" class="badge-ok">LUNAS</span>
+                                <span th:case="'WRITTEN_OFF'" class="badge-muted">WRITE-OFF</span>
+                            </span>
+                        </td>
+                        <td class="td">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <!-- Per cicilan, bukan per faktur: satu jadwal punya satu jatuh tempo
+                                     per cicilan, jadi tanggal faktur tidak bisa mewakilinya. -->
+                                <form th:if="${i.collectible()}" method="post" class="flex items-center gap-1"
+                                      th:action="@{/admin/invoices/{iid}/installments/{id}/due-date(iid=${invoice.id},id=${i.id})}">
+                                    <input th:id="'input-installment-due-date-' + ${i.sequence}" name="dueDate"
+                                           type="date" required th:value="${i.dueDate}"
+                                           class="rounded-md border border-slate-300 px-2 py-1 text-xs">
+                                    <button th:id="'btn-installment-due-date-' + ${i.sequence}" class="text-primary-700 hover:underline" type="submit">Ubah</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <div class="card p-6" th:if="${!invoice.installment and invoice.collectible()}">
+                <div class="mb-3 text-sm font-semibold text-slate-700">Nota Kredit</div>
+                <form id="credit-note-form" class="flex flex-wrap items-end gap-3" method="post"
+                      th:action="@{/admin/invoices/{id}/credit-notes(id=${invoice.id})}">
+                    <div><label class="label" for="credit-note-amount">Nilai</label><input id="credit-note-amount" class="input" name="amount" required/></div>
+                    <div class="grow"><label class="label" for="credit-note-reason">Alasan</label><input id="credit-note-reason" class="input" name="reason"/></div>
+                    <button id="btn-issue-credit-note" class="btn-ghost" type="submit">Nota Kredit</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div id="payment-summary" class="card p-6">
+                <div class="mb-4 text-sm font-semibold text-slate-700">Ringkasan Pembayaran</div>
+                <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500">Nilai faktur</dt>
+                        <dd id="summary-amount" class="font-mono text-slate-800" th:text="${@money.amount(invoice.amount)}"></dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500">Dibayar</dt>
+                        <dd id="summary-paid" class="font-mono text-slate-800" th:text="${@money.amount(paidAmount)}"></dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-slate-500">Nota kredit</dt>
+                        <dd id="summary-credit-note" class="font-mono text-slate-800" th:text="${@money.amount(creditNoteTotal)}"></dd>
+                    </div>
+                    <div class="flex justify-between border-t border-slate-100 pt-2">
+                        <dt class="font-medium text-slate-700">Sisa</dt>
+                        <dd id="summary-outstanding" class="font-mono font-semibold text-primary-700" th:text="${@money.rupiah(invoice.outstanding)}"></dd>
+                    </div>
+                </dl>
+                <div class="mt-4">
+                    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div id="summary-progress-bar" class="h-full rounded-full bg-primary-600"
+                             th:style="'width:' + ${paidPercent} + '%'"></div>
+                    </div>
+                    <div id="summary-progress-label" class="mt-1 text-xs text-slate-400" th:text="${paidPercent} + '% terbayar'"></div>
+                </div>
+            </div>
+
+            <div id="invoice-history" class="card p-6">
+                <div class="mb-4 text-sm font-semibold text-slate-700">Riwayat</div>
+                <div class="space-y-4">
+                    <div th:each="e : ${history}" class="flex items-start gap-3">
+                        <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary-600"></span>
+                        <div class="min-w-0">
+                            <p class="text-sm text-slate-700" th:text="${e.detail}">detail</p>
+                            <p class="mt-0.5 text-xs text-slate-400">
+                                <span th:text="${e.actor}">actor</span> &middot;
+                                <span class="font-mono" th:text="${#temporals.format(e.createdAt, 'dd MMM yyyy HH:mm')}">tanggal</span>
+                            </p>
+                        </div>
+                    </div>
+                    <p id="invoice-history-empty" th:if="${history.isEmpty()}" class="text-sm text-slate-400">Belum ada aktivitas.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

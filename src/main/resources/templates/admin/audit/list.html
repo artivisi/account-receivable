@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Log Audit')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('audit')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <div class="page-header mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Log Audit</h1>
+    </div>
+
+    <form id="search-form" method="get" th:action="@{/admin/audit}" class="toolbar mb-4 flex flex-wrap items-center gap-3">
+        <input id="audit-search" class="input max-w-xs" type="text" name="q"
+               placeholder="Cari aktor / jenis event / detail" th:value="${q}"/>
+        <button id="btn-search" type="submit" class="btn-ghost">Cari</button>
+    </form>
+
+    <div class="card">
+        <div class="table-wrap">
+            <table id="audit-table" class="data-table">
+                <thead class="bg-slate-50"><tr><th class="th">Waktu</th><th class="th">Aktor</th><th class="th">Jenis Event</th>
+                    <th class="th">Entitas</th><th class="th">Detail</th></tr></thead>
+                <tbody>
+                <tr th:each="e : ${events}" th:id="'audit-row-' + ${e.id}">
+                    <td class="td font-mono" th:text="${e.createdAt}"></td>
+                    <td class="td font-mono" th:text="${e.actor}"></td>
+                    <td class="td font-medium" th:text="${e.eventType}"></td>
+                    <td class="td"><span th:text="${e.entityType}"></span> <span class="font-mono" th:text="${e.entityId}"></span></td>
+                    <td class="td" th:text="${e.detail}"></td>
+                </tr>
+                <tr th:if="${events.isEmpty()}"><td id="audit-empty" class="td text-slate-400" colspan="5">Belum ada log audit.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:replace="~{fragments :: pagination(${pageInfo}, '/admin/audit', ${q})}"></div>
+    </div>
+</main>
+</body>
+</html>

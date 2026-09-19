@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+/*
+ * Product theme: navy + IBM Plex, per the "AR Admin UI revamp" design (claude.ai/design project
+ * 6b8f358a-a09b-47f9-9ef7-d4e13cb89b07). This intentionally diverges from the payment-gateway
+ * sibling product's indigo/green theme — see docs/UI.md. A deployment re-brands at runtime by
+ * shadowing /css/branding.css + /img/logo.svg — nothing here is client-specific.
+ */
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-primary-50: #eef3f8;
+  --color-primary-100: #dce7f0;
+  --color-primary-200: #b9d0e3;
+  --color-primary-300: #8fb3d0;
+  --color-primary-400: #5c8ab3;
+  --color-primary-500: #3a6b99;
+  --color-primary-600: #28527a;
+  --color-primary-700: #1e4062;
+  --color-primary-800: #173350;
+  --color-primary-900: #141926;
+  --color-primary-950: #0d1019;
+
+  --color-accent-50: #eaf4ee;
+  --color-accent-100: #d3ead9;
+  --color-accent-400: #4a9868;
+  --color-accent-500: #2f7d4f;
+  --color-accent-600: #266640;
+  --color-accent-700: #1e5233;
+  --color-accent-800: #164026;
+}
+
+@layer components {
+  /* ---- Sidebar navigation (dark navy rail) ---- */
+  .nav-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-primary-200
+           transition hover:bg-white/10 hover:text-white;
+  }
+  .nav-link-active {
+    @apply bg-white/10 text-white;
+  }
+  .nav-icon {
+    @apply h-[18px] w-[18px] shrink-0;
+  }
+  .nav-section {
+    @apply px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-widest text-primary-300/70;
+  }
+
+  /* ---- Surfaces ---- */
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+  .stat-card {
+    @apply rounded-xl border border-slate-200 border-t-2 border-t-primary-600 bg-white p-5 shadow-sm
+           transition hover:shadow-md;
+  }
+
+  /* ---- Buttons ---- */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm
+           font-medium text-white shadow-sm transition hover:bg-primary-700 focus:outline-none
+           focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white
+           px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-rose-300 bg-white
+           px-4 py-2 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-50;
+  }
+
+  /* ---- Forms ---- */
+  .label { @apply mb-1 block text-sm font-medium text-slate-700; }
+  .input {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm
+           transition placeholder:text-slate-400 focus:border-primary-500 focus:outline-none
+           focus:ring-2 focus:ring-primary-500/30;
+  }
+
+  /* ---- Tables ---- */
+  .th {
+    @apply whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+  .td { @apply px-4 py-3 text-sm whitespace-nowrap text-slate-700; }
+
+  /* ---- Data tables (horizontal-scroll wrapper + consistent row treatment) ---- */
+  .table-wrap { @apply w-full overflow-x-auto; }
+  .data-table { @apply min-w-full divide-y divide-slate-200 text-sm; }
+  .data-table tbody { @apply divide-y divide-slate-100; }
+  .data-table tbody tr { @apply transition-colors; }
+  .data-table tbody tr:hover { @apply bg-slate-50; }
+
+  /* ---- Card header (consistent section headers across list/detail cards) ---- */
+  .card-header { @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4; }
+  .card-title { @apply text-sm font-semibold text-slate-700; }
+
+  /* ---- Page header (title + actions row) ---- */
+  .page-header { @apply mb-6 flex flex-wrap items-end justify-between gap-3; }
+
+  /* ---- Toolbar (search + filters row above a table) ---- */
+  .toolbar { @apply mb-4 flex flex-wrap items-center gap-3; }
+
+  /* ---- Badges ---- */
+  .badge-ok {
+    @apply inline-flex items-center rounded-full bg-accent-100 px-2.5 py-0.5 text-xs font-medium text-accent-700;
+  }
+  .badge-muted {
+    @apply inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600;
+  }
+  .badge-warn {
+    @apply inline-flex items-center rounded-full border border-[#ecd9a6] bg-[#fdf6e7] px-2.5 py-0.5
+           text-xs font-medium text-[#8a6414];
+  }
+  .badge-danger {
+    @apply inline-flex items-center rounded-full border border-[#e7c2be] bg-[#fbf1f0] px-2.5 py-0.5
+           text-xs font-medium text-[#a33b32];
+  }
+  .badge-info {
+    @apply inline-flex items-center rounded-full border border-[#c3d5e6] bg-[#e9f0f7] px-2.5 py-0.5
+           text-xs font-medium text-[#28527a];
+  }
+}

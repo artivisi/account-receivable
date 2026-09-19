@@ -1,0 +1,15 @@
+{
+  "type": "invoice.writtenOff",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a10",
+  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "invoiceNumber": "2026082740999001",
+    "debtorCode": "2600000001",
+    "amount": "6500000.00",
+    "outstandingAtDecision": "4333333.00",
+    "reason": "Mahasiswa mengundurkan diri; penagihan dihentikan",
+    "decidedBy": "ar-admin",
+    "decidedAt": "2026-12-01T09:00:00+07:00"
+  }
+}

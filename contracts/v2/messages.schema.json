@@ -1,0 +1,1072 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artivisi.com/contracts/account-receivable/v2/messages.schema.json",
+  "title": "Kontrak Integrasi Tagihan & Pembayaran v2",
+  "description": "Satu message = envelope + payload. Validasi satu message dengan $ref ke $defs/command.<type> atau $defs/event.<type>. Sumber prosa: spesifikasi-integrasi-v2 (PDF).",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/command.invoice.requested"
+    },
+    {
+      "$ref": "#/$defs/command.invoice.amended"
+    },
+    {
+      "$ref": "#/$defs/command.invoice.planAmended"
+    },
+    {
+      "$ref": "#/$defs/command.invoice.cancelled"
+    },
+    {
+      "$ref": "#/$defs/command.invoice.announcementRequested"
+    },
+    {
+      "$ref": "#/$defs/command.debtor.upserted"
+    },
+    {
+      "$ref": "#/$defs/event.invoice.issued"
+    },
+    {
+      "$ref": "#/$defs/event.invoice.rejected"
+    },
+    {
+      "$ref": "#/$defs/event.invoice.planAmended"
+    },
+    {
+      "$ref": "#/$defs/event.charge.opened"
+    },
+    {
+      "$ref": "#/$defs/event.charge.repriced"
+    },
+    {
+      "$ref": "#/$defs/event.charge.cancelled"
+    },
+    {
+      "$ref": "#/$defs/event.payment.received"
+    },
+    {
+      "$ref": "#/$defs/event.invoice.cancelled"
+    },
+    {
+      "$ref": "#/$defs/event.invoice.writtenOff"
+    }
+  ],
+  "$defs": {
+    "money": {
+      "type": "string",
+      "pattern": "^[0-9]{1,15}\\.[0-9]{2}$",
+      "description": "Nominal uang sebagai string desimal, dua angka di belakang koma."
+    },
+    "moneyPositive": {
+      "type": "string",
+      "pattern": "^(?!0+\\.00$)[0-9]{1,15}\\.[0-9]{2}$",
+      "description": "Seperti money, dan lebih besar dari nol."
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "IDR"
+      ]
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "format": "date"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?[+-][0-9]{2}:[0-9]{2}$",
+      "description": "ISO-8601 dengan offset zona waktu."
+    },
+    "debtorCode": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "invoiceNumber": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Stabil terhadap pengulangan maksud yang sama. Tanpa timestamp, angka acak, atau nomor urut percobaan."
+    },
+    "reasonText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "planItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "dueDate",
+        "amount"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        }
+      }
+    },
+    "planItemWithStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "dueDate",
+        "amount",
+        "status"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "PARTIALLY_PAID",
+            "PAID",
+            "WRITTEN_OFF",
+            "CANCELLED"
+          ]
+        }
+      }
+    },
+    "paymentPlan": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/planItem"
+      }
+    },
+    "envelope": {
+      "type": "object",
+      "required": [
+        "type",
+        "eventId",
+        "occurredAt",
+        "producer",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "occurredAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "producer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "payload": {
+          "type": "object"
+        }
+      }
+    },
+    "payload.invoice.requested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idempotencyKey",
+        "debtorCode",
+        "invoiceTypeCode",
+        "issueDate",
+        "dueDate",
+        "currency",
+        "amount",
+        "description"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "$ref": "#/$defs/idempotencyKey"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "invoiceTypeCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "dueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "paymentPlan": {
+          "$ref": "#/$defs/paymentPlan"
+        },
+        "openCharge": {
+          "type": "boolean",
+          "description": "Buka charge sekarang. Bila dihilangkan bernilai true, sehingga perilaku producer lama tidak berubah. false berarti tagihan tercatat tanpa VA, dan pembukaannya diminta kemudian lewat charge.openRequested."
+        }
+      }
+    },
+    "payload.invoice.amended": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idempotencyKey",
+        "invoiceNumber",
+        "reason"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "$ref": "#/$defs/idempotencyKey"
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "amount": {
+          "$ref": "#/$defs/money"
+        },
+        "dueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "reason": {
+          "$ref": "#/$defs/reasonText"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "amount"
+          ]
+        },
+        {
+          "required": [
+            "dueDate"
+          ]
+        }
+      ],
+      "description": "Minimal salah satu dari amount atau dueDate harus ada. amount boleh 0.00: tagihan menjadi CANCELLED."
+    },
+    "payload.invoice.planAmended": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idempotencyKey",
+        "invoiceNumber",
+        "paymentPlan",
+        "reason"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "$ref": "#/$defs/idempotencyKey"
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "paymentPlan": {
+          "$ref": "#/$defs/paymentPlan"
+        },
+        "reason": {
+          "$ref": "#/$defs/reasonText"
+        }
+      }
+    },
+    "payload.invoice.cancelled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idempotencyKey",
+        "invoiceNumber",
+        "reason"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "$ref": "#/$defs/idempotencyKey"
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "SUPERSEDED",
+            "DUPLICATE",
+            "ISSUED_IN_ERROR",
+            "WITHDRAWN"
+          ]
+        },
+        "replacedBy": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "if": {
+        "properties": {
+          "reason": {
+            "const": "SUPERSEDED"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "replacedBy"
+        ]
+      }
+    },
+    "payload.invoice.announcementRequested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        }
+      }
+    },
+    "payload.debtor.upserted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "debtorCode",
+        "name"
+      ],
+      "properties": {
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 200
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 32
+        }
+      }
+    },
+    "payload.invoice.issued": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "debtorCode",
+        "invoiceTypeCode",
+        "currency",
+        "amount",
+        "issueDate",
+        "dueDate",
+        "description"
+      ],
+      "properties": {
+        "correlationId": {
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "invoiceTypeCode": {
+          "type": "string"
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "issueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "dueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "payload.invoice.rejected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correlationId",
+        "code",
+        "reason"
+      ],
+      "properties": {
+        "correlationId": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "DEBTOR_NOT_FOUND",
+            "INVOICE_TYPE_UNKNOWN",
+            "AMOUNT_INVALID",
+            "DUE_DATE_INVALID",
+            "PLAN_INVALID",
+            "INVOICE_NOT_FOUND",
+            "INVOICE_NOT_AMENDABLE",
+            "REPLACED_BY_REQUIRED",
+            "VA_NUMBER_UNAVAILABLE",
+            "SCHEMA_INVALID"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "payload.event.invoice.planAmended": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "debtorCode",
+        "amount",
+        "cumulativePaid",
+        "outstanding",
+        "paymentPlan",
+        "reason",
+        "decidedBy",
+        "decidedAt"
+      ],
+      "properties": {
+        "correlationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "cumulativePaid": {
+          "$ref": "#/$defs/money"
+        },
+        "outstanding": {
+          "$ref": "#/$defs/money"
+        },
+        "paymentPlan": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/planItemWithStatus"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "decidedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decidedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "payload.charge.opened": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "debtorCode",
+        "vaNumber",
+        "interbankVaNumber",
+        "bank",
+        "amount",
+        "expiresAt"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "vaNumber": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "interbankVaNumber": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "bank": {
+          "type": "string",
+          "minLength": 1
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/date"
+        }
+      }
+    },
+    "payload.charge.repriced": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "vaNumber",
+        "amount",
+        "reason"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "vaNumber": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "INVOICE_AMENDED",
+            "INSTALLMENT_DUE",
+            "PLAN_AMENDED"
+          ]
+        }
+      }
+    },
+    "payload.charge.cancelled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "vaNumber",
+        "reason"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "vaNumber": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "INVOICE_CANCELLED",
+            "INVOICE_PAID",
+            "INVOICE_WRITTEN_OFF",
+            "EXPIRED",
+            "INSTALLMENT_ROLLOVER"
+          ]
+        }
+      }
+    },
+    "payload.payment.received": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "debtorCode",
+        "vaNumber",
+        "currency",
+        "amount",
+        "cumulativePaid",
+        "outstanding",
+        "bank",
+        "reference",
+        "paidAt",
+        "invoiceStatus"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "vaNumber": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "cumulativePaid": {
+          "$ref": "#/$defs/money"
+        },
+        "outstanding": {
+          "$ref": "#/$defs/money"
+        },
+        "bank": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paidAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "invoiceStatus": {
+          "type": "string",
+          "enum": [
+            "PARTIALLY_PAID",
+            "PAID"
+          ]
+        }
+      }
+    },
+    "payload.event.invoice.cancelled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "debtorCode",
+        "amount",
+        "outstandingAtDecision",
+        "reason",
+        "decidedBy",
+        "decidedAt"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "outstandingAtDecision": {
+          "$ref": "#/$defs/money"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "SUPERSEDED",
+            "DUPLICATE",
+            "ISSUED_IN_ERROR",
+            "WITHDRAWN",
+            "AMENDED_TO_ZERO"
+          ]
+        },
+        "replacedBy": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "decidedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decidedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "payload.invoice.writtenOff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoiceNumber",
+        "debtorCode",
+        "amount",
+        "outstandingAtDecision",
+        "reason",
+        "decidedBy",
+        "decidedAt"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "outstandingAtDecision": {
+          "$ref": "#/$defs/money"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decidedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decidedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "command.invoice.requested": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.requested"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.requested"
+            }
+          }
+        }
+      ]
+    },
+    "command.invoice.amended": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.amended"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.amended"
+            }
+          }
+        }
+      ]
+    },
+    "command.invoice.planAmended": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.planAmended"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.planAmended"
+            }
+          }
+        }
+      ]
+    },
+    "command.invoice.cancelled": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.cancelled"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.cancelled"
+            }
+          }
+        }
+      ]
+    },
+    "command.invoice.announcementRequested": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.announcementRequested"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.announcementRequested"
+            }
+          }
+        }
+      ]
+    },
+    "command.debtor.upserted": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "debtor.upserted"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.debtor.upserted"
+            }
+          }
+        }
+      ]
+    },
+    "event.invoice.issued": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.issued"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.issued"
+            }
+          }
+        }
+      ]
+    },
+    "event.invoice.rejected": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.rejected"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.rejected"
+            }
+          }
+        }
+      ]
+    },
+    "event.invoice.planAmended": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.planAmended"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.event.invoice.planAmended"
+            }
+          }
+        }
+      ]
+    },
+    "event.charge.opened": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "charge.opened"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.charge.opened"
+            }
+          }
+        }
+      ]
+    },
+    "event.charge.repriced": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "charge.repriced"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.charge.repriced"
+            }
+          }
+        }
+      ]
+    },
+    "event.charge.cancelled": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "charge.cancelled"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.charge.cancelled"
+            }
+          }
+        }
+      ]
+    },
+    "event.payment.received": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "payment.received"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.payment.received"
+            }
+          }
+        }
+      ]
+    },
+    "event.invoice.cancelled": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.cancelled"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.event.invoice.cancelled"
+            }
+          }
+        }
+      ]
+    },
+    "event.invoice.writtenOff": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.writtenOff"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.writtenOff"
+            }
+          }
+        }
+      ]
+    },
+    "payload.charge.openRequested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idempotencyKey",
+        "invoiceNumber"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "$ref": "#/$defs/idempotencyKey"
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        }
+      }
+    },
+    "command.charge.openRequested": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "charge.openRequested"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.charge.openRequested"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

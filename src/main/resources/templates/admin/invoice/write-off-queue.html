@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Antrean Hapus Buku')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('write-off-queue')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8">
+    <div class="mb-6">
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Antrean Hapus Buku</h1>
+        <p class="mt-1 text-sm text-slate-500">
+            Piutang yang masih tercatat terutang, tetapi tidak ada lagi yang bisa membayarnya — VA-nya
+            sudah ditutup, atau sistem penagih menyatakan tagihannya ditarik. Tiap baris butuh
+            keputusan: tetap ditagih, atau hapus buku.
+        </p>
+    </div>
+
+    <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
+    <div id="flash-error" th:if="${error}" class="mb-4 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+
+    <!-- VA ditutup != utang dihapus. Menyamakan keduanya menghapus piutang yang masih nyata: pada
+         2026-08-18 satu angsuran UKT tampak persis seperti kandidat hapus buku, padahal rail yang
+         menyatakannya batal justru mencatat angsuran sebelumnya sebagai belum dibayar sementara dua
+         rail lain mencatatnya lunas. -->
+    <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <strong>Periksa satu per satu.</strong> Kolom <em>Bukti</em> menunjukkan apa yang bisa
+        dibuktikan buku besar, bukan kesimpulannya. Hapus buku bersifat permanen dan tidak bisa
+        dibatalkan — karena itu tidak ada tombol hapus buku massal di halaman ini.
+    </div>
+
+    <div class="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span class="text-slate-500">Rentang:</span>
+        <a th:each="d : ${windows}"
+           th:id="'tab-window-' + ${d}"
+           class="rounded-full px-3 py-1.5 font-medium transition"
+           th:classappend="${days == d} ? 'bg-primary-600 text-white' : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'"
+           th:href="@{/admin/invoices/write-off-queue(days=${d})}"
+           th:text="${d} + ' hari'"></a>
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <table id="write-off-queue-table" class="w-full text-sm">
+            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+                <th class="th">Faktur</th>
+                <th class="th">Debitur</th>
+                <th class="th text-right">Sisa</th>
+                <th class="th">Bukti</th>
+                <th class="th">Keputusan</th>
+            </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            <tr th:each="row : ${queue}" th:id="'queue-row-' + ${row.invoiceId}" class="align-top">
+                <td class="td">
+                    <a class="text-primary-700 hover:underline"
+                       th:href="@{/admin/invoices/{id}(id=${row.invoiceId})}"
+                       th:text="${row.invoiceNumber}"></a>
+                    <div th:if="${row.sourceBillNumber}" class="font-mono text-xs text-slate-400"
+                         th:text="${row.sourceBillNumber}"></div>
+                    <div class="text-xs text-slate-400" th:text="'Jatuh tempo ' + ${row.dueDate}"></div>
+                </td>
+                <td class="td">
+                    <span th:text="${row.debtorName}"></span>
+                    <div class="text-xs text-slate-400" th:text="${row.debtorCode}"></div>
+                    <div th:if="${row.description}" class="text-xs text-slate-400" th:text="${row.description}"></div>
+                </td>
+                <td class="td text-right font-mono" th:text="${@money.rupiah(row.outstanding)}"></td>
+
+                <!-- Bukti, bukan kesimpulan. Nomor VA dipakai ulang antar tagihan, jadi adanya
+                     pembayaran pada nomor yang sama TIDAK membuktikan tagihan ini yang lunas —
+                     bisa jadi itu tagihan periode lain. Karena itu labelnya "mungkin". -->
+                <td class="td">
+                    <span th:switch="${row.verdict().name()}" th:remove="tag">
+                        <span th:case="'POSSIBLY_SETTLED'"
+                              th:id="'verdict-' + ${row.invoiceId}"
+                              class="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Mungkin sudah lunas</span>
+                        <span th:case="'NEVER_BILLED'"
+                              th:id="'verdict-' + ${row.invoiceId}"
+                              class="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">Belum pernah ditagih</span>
+                        <span th:case="'UNCOLLECTIBLE'"
+                              th:id="'verdict-' + ${row.invoiceId}"
+                              class="inline-block rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800">Tidak bisa ditagih</span>
+                    </span>
+                    <span th:if="${row.withdrawnUpstream()}"
+                          th:id="'withdrawn-' + ${row.invoiceId}"
+                          class="ml-1 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">Ditarik sistem penagih</span>
+
+                    <div th:if="${row.paidSiblingBill}" class="mt-1 text-xs text-slate-500">
+                        Tagihan <span class="font-mono" th:text="${row.paidSiblingBill}"></span> pada
+                        VA yang sama sudah lunas
+                        <span th:text="'(' + ${@money.rupiah(row.paidOnSameVaNumber)} + ')'"></span> —
+                        <strong>cocokkan dulu</strong>, nomor VA dipakai ulang antar periode.
+                    </div>
+                    <div th:if="${row.withdrawnReason}" class="mt-1 text-xs text-slate-500"
+                         th:text="${row.withdrawnReason}"></div>
+                    <div th:if="${row.vaNumber}" class="mt-1 font-mono text-xs text-slate-400"
+                         th:text="'VA ' + ${row.vaNumber}"></div>
+                    <div th:if="${row.cashApplications > 0}" class="mt-1 text-xs text-rose-700"
+                         th:text="'Ada ' + ${row.cashApplications} + ' alokasi kas pada faktur ini'"></div>
+                </td>
+
+                <td class="td">
+                    <div class="flex flex-col gap-2">
+                        <form method="post" class="flex items-center gap-1"
+                              th:action="@{/admin/invoices/{id}/keep(id=${row.invoiceId})}">
+                            <input th:id="'input-keep-note-' + ${row.invoiceId}" name="note" required
+                                   maxlength="255" placeholder="Alasan tetap ditagih"
+                                   class="w-44 rounded-md border border-slate-300 px-2 py-1 text-xs">
+                            <button th:id="'btn-keep-' + ${row.invoiceId}" class="btn-ghost px-2 py-1 text-xs"
+                                    type="submit">Tetap tagih</button>
+                        </form>
+                        <form method="post" class="flex items-center gap-1"
+                              th:action="@{/admin/invoices/{id}/write-off(id=${row.invoiceId})}"
+                              onsubmit="return confirm('Hapus buku faktur ini? Tindakan ini permanen.');">
+                            <input type="hidden" name="from" value="queue">
+                            <input th:id="'input-write-off-reason-' + ${row.invoiceId}" name="reason" required
+                                   maxlength="255" placeholder="Alasan hapus buku"
+                                   class="w-44 rounded-md border border-slate-300 px-2 py-1 text-xs">
+                            <button th:id="'btn-write-off-' + ${row.invoiceId}" class="btn-danger px-2 py-1 text-xs"
+                                    type="submit">Hapus buku</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            <tr th:if="${queue.isEmpty()}">
+                <td class="td text-slate-500" colspan="5">
+                    Tidak ada piutang yang menunggu keputusan pada rentang ini.
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between text-sm text-slate-500">
+        <span>Total <span id="queue-total" th:text="${total}"></span> baris</span>
+        <div class="flex items-center gap-2">
+            <a th:if="${hasPrev}" id="btn-prev-page" class="btn-ghost px-3 py-1"
+               th:href="@{/admin/invoices/write-off-queue(days=${days},page=${page - 1})}">&lsaquo; Sebelumnya</a>
+            <span th:unless="${hasPrev}" id="btn-prev-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">&lsaquo; Sebelumnya</span>
+            <span id="page-indicator" th:text="${page + 1}"></span>
+            <a th:if="${hasNext}" id="btn-next-page" class="btn-ghost px-3 py-1"
+               th:href="@{/admin/invoices/write-off-queue(days=${days},page=${page + 1})}">Berikutnya &rsaquo;</a>
+            <span th:unless="${hasNext}" id="btn-next-page" class="btn-ghost pointer-events-none px-3 py-1 opacity-40">Berikutnya &rsaquo;</span>
+        </div>
+    </div>
+
+    <p class="mt-6 text-xs text-slate-400">
+        Antrean ini hanya memuat kejadian yang benar-benar teramati: pembatalan VA sejak rentang yang
+        dipilih, atau penarikan tagihan yang dilaporkan sistem penagih. Piutang lama hasil migrasi
+        tidak punya catatan kapan VA-nya ditutup sehingga tidak muncul di sini — pembersihan riwayat
+        itu kampanye hapus buku tersendiri, lihat laporan penyisihan. Baris yang sudah diputuskan
+        &ldquo;tetap tagih&rdquo; ikut disembunyikan sampai ada bukti baru.
+    </p>
+</main>
+</body>
+</html>

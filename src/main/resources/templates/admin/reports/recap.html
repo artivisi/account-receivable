@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Laporan')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('reports')}"></div>
+<main class="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <div>
+        <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Laporan</h1>
+    </div>
+    <div th:replace="~{fragments :: reportTabs('recap')}"></div>
+    <div class="card">
+        <div class="table-wrap">
+            <table id="recap-table" class="data-table">
+                <thead class="bg-slate-50"><tr><th class="th">Tipe</th><th class="th">Jumlah</th><th class="th">Nilai</th><th class="th">Sisa</th></tr></thead>
+                <tbody>
+                <tr th:each="t : ${recap.byType}" th:id="'recap-row-' + ${t.invoiceTypeCode}">
+                    <td class="td font-mono" th:text="${t.invoiceTypeCode}"></td>
+                    <td class="td" th:text="${t.count}"></td>
+                    <td class="td font-mono" th:text="${@money.amount(t.totalAmount)}"></td>
+                    <td class="td font-mono" th:text="${@money.amount(t.totalOutstanding)}"></td>
+                </tr>
+                <tr th:if="${recap.byType.isEmpty()}"><td id="recap-empty" class="td text-slate-400" colspan="4">Tidak ada data.</td></tr>
+                </tbody>
+                <tfoot><tr class="bg-slate-50"><td class="td font-semibold">Total</td><td class="td"></td>
+                    <td id="recap-total-amount" class="td font-semibold font-mono" th:text="${@money.rupiah(recap.totalAmount)}"></td>
+                    <td id="recap-total-outstanding" class="td font-semibold font-mono text-primary-700" th:text="${@money.rupiah(recap.totalOutstanding)}"></td></tr></tfoot>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

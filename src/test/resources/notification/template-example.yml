@@ -1,0 +1,56 @@
+# Notification template for a hub whose templates predate AR and use Indonesian variable names.
+# Imported with SPRING_CONFIG_IMPORT=file:<this file> alongside AR_NOTIFICATION_PAYLOAD_MAPPER=TEMPLATE.
+#
+# Keys are the hub's variable names (bracketed so their case survives binding); values are literal
+# text with {variable} references to AR's own variables for the event. ${...} are resolved from the
+# environment at startup and hold deployment text: the bank name and VA display prefix the payer is
+# shown, and the institution's contact details. An unset one fails startup.
+ar:
+  notification:
+    template:
+      envelope:
+        config-id: konfigurasi
+        email: email
+        mobile: mobile
+        data: data
+      bill-issued:
+        "[nomorTagihan]": "{invoiceNumber}"
+        # the ISSUE date — the hub's tanggalTagihan is not the due date
+        "[tanggalTagihan]": "{issueDate}"
+        "[nama]": "{debtorName}"
+        "[email]": "{email}"
+        # sent whether or not SMS is enabled: that gate decides recipients, not what an email prints
+        "[noHp]": "{phone}"
+        # unformatted; the hub's template does its own formatting
+        "[jumlah]": "{amount}"
+        # prose, not a number: bank name plus the display-prefixed VA
+        "[rekening]": "${AR_NOTIFICATION_BANK_NAME} ${AR_NOTIFICATION_VA_DISPLAY_PREFIX}{vaNumber}"
+        # injected as raw HTML by the hub, so several banks can be listed
+        "[rekeningFull]": "<ul><li>${AR_NOTIFICATION_BANK_NAME} ${AR_NOTIFICATION_VA_DISPLAY_PREFIX}{vaNumber}</li></ul>"
+        # the bill type alone, not a description with the payer's name appended
+        "[keterangan]": "{invoiceType}"
+        "[contactinfo]": "${AR_NOTIFICATION_CONTACT_INFO}"
+        "[contactinfoFull]": "${AR_NOTIFICATION_CONTACT_INFO_FULL}"
+      payment-received:
+        "[nomorTagihan]": "{invoiceNumber}"
+        "[tanggalTagihan]": "{issueDate}"
+        "[nama]": "{debtorName}"
+        "[nilaiTagihan]": "{invoiceAmount}"
+        "[nilaiPembayaran]": "{paymentAmount}"
+        "[noHp]": "{phone}"
+        # a receipt names the bank, not the number that was paid into
+        "[rekening]": "${AR_NOTIFICATION_BANK_NAME}"
+        "[keterangan]": "{invoiceType}"
+        "[contactinfo]": "${AR_NOTIFICATION_CONTACT_INFO}"
+        "[contactinfoFull]": "${AR_NOTIFICATION_CONTACT_INFO_FULL}"
+        # local wall-clock time, not an ISO instant
+        "[waktu]": "{paidAtLocal}"
+        "[referensi]": "{paymentReference}"
+      # The hub has no dunning template of its own yet; AR's names pass through unchanged.
+      dunning:
+        "[debtorName]": "{debtorName}"
+        "[invoiceNumber]": "{invoiceNumber}"
+        "[currency]": "{currency}"
+        "[amountOutstanding]": "{amountOutstanding}"
+        "[dueDate]": "{dueDate}"
+        "[daysOverdue]": "{daysOverdue}"

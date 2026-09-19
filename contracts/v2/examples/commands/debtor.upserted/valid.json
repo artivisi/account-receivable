@@ -1,0 +1,12 @@
+{
+  "type": "debtor.upserted",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a10",
+  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "producer": "aplikasi-akademik",
+  "payload": {
+    "debtorCode": "2600000001",
+    "name": "Nama Debitur",
+    "email": "debitur@example.org",
+    "phone": "081234567890"
+  }
+}

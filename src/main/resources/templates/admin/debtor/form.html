@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Debitur')}"></head>
+<body class="min-h-screen bg-slate-50 text-slate-900 md:pl-60">
+<div th:replace="~{fragments :: sidebar('debtors')}"></div>
+<main class="mx-auto max-w-2xl px-4 py-8">
+    <h1 id="page-title" class="mb-6 text-2xl font-semibold text-slate-900"
+        th:text="${mode == 'edit'} ? 'Ubah Debitur' : 'Debitur Baru'">Debitur</h1>
+    <div id="form-error" th:if="${error}" class="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
+    <form id="debtor-form" class="card space-y-4 p-6"
+          th:action="${mode == 'edit'} ? @{/admin/debtors/{id}(id=${debtor.id})} : @{/admin/debtors}" method="post">
+        <div>
+            <label class="label" for="debtor-code">Kode</label>
+            <input id="debtor-code" class="input" name="code" th:value="${debtor != null} ? ${debtor.code} : ''"
+                   th:readonly="${mode == 'edit'}" required/>
+        </div>
+        <div>
+            <label class="label" for="debtor-name">Nama</label>
+            <input id="debtor-name" class="input" name="name" th:value="${debtor != null} ? ${debtor.name} : ''" required/>
+        </div>
+        <div>
+            <label class="label" for="debtor-email">Email</label>
+            <input id="debtor-email" class="input" name="email" type="email" th:value="${debtor != null} ? ${debtor.email} : ''"/>
+        </div>
+        <div>
+            <label class="label" for="debtor-phone">Telepon</label>
+            <input id="debtor-phone" class="input" name="phone" th:value="${debtor != null} ? ${debtor.phone} : ''"/>
+        </div>
+        <div>
+            <label class="label" for="debtor-status">Status</label>
+            <select id="debtor-status" class="input" name="status">
+                <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.name() == 'ACTIVE'} ? 'AKTIF' : 'NONAKTIF'"
+                        th:selected="${debtor != null and debtor.status == s}"></option>
+            </select>
+        </div>
+        <div class="flex gap-2">
+            <button id="btn-save-debtor" class="btn-primary" type="submit">Simpan</button>
+            <a id="btn-cancel" class="btn-ghost" th:href="@{/admin/debtors}">Batal</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

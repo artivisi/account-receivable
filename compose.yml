@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: accountreceivable
+      POSTGRES_USER: accountreceivable
+      POSTGRES_PASSWORD: accountreceivable
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-accountreceivable:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accountreceivable -d accountreceivable"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-accountreceivable:
