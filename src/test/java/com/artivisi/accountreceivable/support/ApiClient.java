@@ -101,9 +101,9 @@ public class ApiClient {
                 .post("/api/invoices/{id}/write-off", invoiceId).then().statusCode(200);
     }
 
-    public void creditNote(String invoiceId, int amount, String reason) {
+    public void creditNote(String invoiceId, int amount, String reasonCode, String reason) {
         given().port(port).contentType("application/json")
-                .body(Map.of("invoiceId", invoiceId, "amount", amount, "reason", reason))
+                .body(Map.of("invoiceId", invoiceId, "amount", amount, "reasonCode", reasonCode, "reason", reason))
                 .post("/api/credit-notes").then().statusCode(201);
     }
 

@@ -180,11 +180,24 @@
                 </div>
             </div>
 
-            <div class="card p-6" th:if="${!invoice.installment and invoice.collectible()}">
-                <div class="mb-3 text-sm font-semibold text-slate-700">Nota Kredit</div>
+            <div class="card p-6" th:if="${invoice.collectible()}">
+                <div class="mb-1 text-sm font-semibold text-slate-700">Nota Kredit</div>
+                <p class="mb-3 text-xs text-slate-500">
+                    Untuk beasiswa, potongan, dan koreksi nilai. Sisa tagihan berkurang, nilai faktur tetap,
+                    dan VA-nya ikut disesuaikan — ditutup bila sisanya nol. Jangan dipakai mencatat uang masuk.
+                </p>
                 <form id="credit-note-form" class="flex flex-wrap items-end gap-3" method="post"
                       th:action="@{/admin/invoices/{id}/credit-notes(id=${invoice.id})}">
                     <div><label class="label" for="credit-note-amount">Nilai</label><input id="credit-note-amount" class="input" name="amount" required/></div>
+                    <div>
+                        <label class="label" for="credit-note-reason-code">Jenis</label>
+                        <select id="credit-note-reason-code" class="input" name="reasonCode" required>
+                            <option value="SCHOLARSHIP">Beasiswa</option>
+                            <option value="DISCOUNT">Potongan</option>
+                            <option value="CORRECTION">Koreksi</option>
+                        </select>
+                    </div>
+                    <div><label class="label" for="credit-note-reference">Rujukan (nomor SK)</label><input id="credit-note-reference" class="input" name="reference"/></div>
                     <div class="grow"><label class="label" for="credit-note-reason">Alasan</label><input id="credit-note-reason" class="input" name="reason"/></div>
                     <button id="btn-issue-credit-note" class="btn-ghost" type="submit">Nota Kredit</button>
                 </form>

@@ -2,6 +2,7 @@ package com.artivisi.accountreceivable.web;
 
 import com.artivisi.accountreceivable.dto.ChargeResponse;
 import com.artivisi.accountreceivable.dto.CreditNoteRequest;
+import com.artivisi.accountreceivable.entity.CreditReason;
 import com.artivisi.accountreceivable.dto.DueDateOutcome;
 import com.artivisi.accountreceivable.dto.InvoiceListItem;
 import com.artivisi.accountreceivable.dto.ReviewQueueItem;
@@ -13,7 +14,6 @@ import com.artivisi.accountreceivable.entity.CreditNote;
 import com.artivisi.accountreceivable.repository.AuditEventRepository;
 import com.artivisi.accountreceivable.repository.CreditNoteRepository;
 import com.artivisi.accountreceivable.service.CollectionService;
-import com.artivisi.accountreceivable.service.CreditNoteService;
 import com.artivisi.accountreceivable.service.InvoiceService;
 import com.artivisi.accountreceivable.service.InvoiceTypeService;
 import com.artivisi.accountreceivable.service.ReceivableReviewService;
@@ -46,7 +46,6 @@ public class InvoiceAdminController {
 
     private final InvoiceService invoiceService;
     private final CollectionService collectionService;
-    private final CreditNoteService creditNoteService;
     private final InvoiceTypeService invoiceTypeService;
     private final ReceivableReviewService reviewService;
     private final com.artivisi.accountreceivable.service.ReceivableAnomalyService anomalyService;
@@ -55,7 +54,6 @@ public class InvoiceAdminController {
     private final Clock clock;
 
     public InvoiceAdminController(InvoiceService invoiceService, CollectionService collectionService,
-                                 CreditNoteService creditNoteService,
                                  InvoiceTypeService invoiceTypeService,
                                  ReceivableReviewService reviewService,
                                  com.artivisi.accountreceivable.service.ReceivableAnomalyService anomalyService,
@@ -63,7 +61,6 @@ public class InvoiceAdminController {
                                  AuditEventRepository auditEventRepository, Clock clock) {
         this.invoiceService = invoiceService;
         this.collectionService = collectionService;
-        this.creditNoteService = creditNoteService;
         this.invoiceTypeService = invoiceTypeService;
         this.reviewService = reviewService;
         this.anomalyService = anomalyService;
@@ -298,9 +295,11 @@ public class InvoiceAdminController {
 
     @PostMapping("/{id}/credit-notes")
     public String creditNote(@PathVariable String id, @RequestParam BigDecimal amount,
+                             @RequestParam CreditReason reasonCode,
+                             @RequestParam(required = false) String reference,
                              @RequestParam(required = false) String reason, RedirectAttributes ra) {
         try {
-            creditNoteService.issue(new CreditNoteRequest(id, amount, reason));
+            collectionService.issueCreditNote(new CreditNoteRequest(id, amount, reasonCode, reference, reason));
             ra.addFlashAttribute("msg", "Nota kredit berhasil diterbitkan");
         } catch (RuntimeException e) {
             ra.addFlashAttribute("error", e.getMessage());

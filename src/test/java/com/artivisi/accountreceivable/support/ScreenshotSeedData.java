@@ -98,7 +98,7 @@ public class ScreenshotSeedData {
         // 7. Credit note against an open invoice.
         Response creditNoted = api.issue("DBT-003", "REG", today.minusDays(3), today.plusDays(27),
                 "Registrasi dengan koreksi", List.of(ApiClient.line("Biaya registrasi", 1, 1_200_000)), null);
-        api.creditNote(creditNoted.path("id"), 200_000, "Koreksi kelebihan tagih");
+        api.creditNote(creditNoted.path("id"), 200_000, "CORRECTION", "Koreksi kelebihan tagih");
 
         // 8. Overdue invoice for a debtor without email → dunning error row.
         api.issue("DBT-005", "REG", today.minusDays(50), today.minusDays(20),

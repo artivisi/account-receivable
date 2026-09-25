@@ -76,6 +76,27 @@ AR is a **Consumer** of the gateway (it holds a client id/secret + a webhook end
   `INSTALLMENT` semantics (one charge, many payments) and does not reuse numbers, so the path is inert.
 - `consumerReference` on the gateway `Charge` carries this app's invoice/installment id for matching.
 
+## Settled without money: credit notes
+
+A scholarship, a discount and a mispriced bill all end with the payer owing less, and none of them is
+a payment. Recording them as one invents cash that no bank will ever settle, which is exactly what
+reconciliation then cannot match. They are credit notes: the invoice keeps its amount, the credit note
+carries the reduction, and the two together still show what was billed and why it was not collected.
+
+- `reasonCode` is required — `SCHOLARSHIP` (someone else settles a real debt), `DISCOUNT` (the price
+  changed) or `CORRECTION` (the bill was wrong). A scholarship also needs `reference`, the decision it
+  rests on; an award nobody can trace to a decree is indistinguishable from a mistake.
+- **The gateway must follow.** `CollectionService.issueCreditNote` cancels the charge when nothing is
+  left owing and reprices it when something is, because a settled bill whose VA still asks for money
+  gets paid a second time. Never call `CreditNoteService` directly.
+- On a plan the credit lands on the **last unpaid instalment** and walks backwards, so the legs the
+  payer has already been told about keep their figures — the same rule `amendAmount` follows.
+- Reports of money collected read **cash applications**, never invoice status: a fully credited
+  invoice is PAID and carries no cash.
+- Where the decision comes from is the upstream app's business: a discount is a price correction
+  (`invoice.amended`), a scholarship is a credit. Ask which one it is — an institution that advertises
+  a discount as a "scholarship" will send the word, not the meaning.
+
 ## Governance
 
 Generic ArtiVisi product. The **engine code** carries no client names, credentials, endpoints, or

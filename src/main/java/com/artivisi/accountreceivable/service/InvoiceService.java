@@ -388,6 +388,45 @@ public class InvoiceService {
         return invoice;
     }
 
+    /**
+     * Reduce what is still owed without any money arriving — the effect of a credit note.
+     *
+     * <p>The invoice amount is left alone: it says what the debt was, and the credit note is the
+     * document saying part of it is not collectible from the payer. Only {@code outstanding} moves,
+     * so a scholarship stays visible as an award rather than disappearing into a smaller bill.
+     *
+     * <p>On a plan the credit lands on the LAST unpaid instalment and walks backwards if it is larger
+     * than that leg, so the legs the payer has already been told about keep their figures for as long
+     * as the credit allows — the same rule an amount amendment follows.
+     */
+    @Transactional
+    public void applyCredit(Invoice invoice, BigDecimal amount) {
+        if (!invoice.isInstallment()) {
+            invoice.setOutstanding(invoice.getOutstanding().subtract(amount));
+            invoice.setPaymentStatus(statusFor(invoice.getOutstanding(), invoice.getAmount()));
+            invoice.recomputeEarliestUnpaidDueDate();
+            return;
+        }
+        BigDecimal left = amount;
+        for (Installment leg : invoice.getSchedule().ordered().reversed()) {
+            if (left.signum() == 0) {
+                break;
+            }
+            BigDecimal take = leg.getOutstanding().min(left);
+            if (take.signum() == 0) {
+                continue;
+            }
+            leg.setOutstanding(leg.getOutstanding().subtract(take));
+            leg.setPaymentStatus(statusFor(leg.getOutstanding(), leg.getAmount()));
+            left = left.subtract(take);
+        }
+        if (left.signum() > 0) {
+            throw new InvalidRequestException("PLAN_INVALID", "Credit of " + amount + " exceeds what the"
+                    + " instalments of " + invoice.getInvoiceNumber() + " still owe");
+        }
+        rollUpSchedule(invoice);
+    }
+
     private void rollUpSchedule(Invoice invoice) {
         BigDecimal outstanding = invoice.getSchedule().getInstallments().stream()
                 .map(Installment::getOutstanding)

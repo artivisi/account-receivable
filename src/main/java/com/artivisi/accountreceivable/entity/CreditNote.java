@@ -1,6 +1,8 @@
 package com.artivisi.accountreceivable.entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -34,5 +36,13 @@ public class CreditNote extends BaseEntity {
 
     private BigDecimal amount;
 
+    /** What kind of correction this is. NULL only on notes issued before the kind was recorded. */
+    @Enumerated(EnumType.STRING)
+    private CreditReason reasonCode;
+
+    /** The decision this credit rests on: a scholarship decree, an approval, a ticket. */
+    private String reference;
+
+    /** Free text for the reviewer, beside the kind. */
     private String reason;
 }

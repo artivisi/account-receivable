@@ -11,6 +11,8 @@ import com.artivisi.accountreceivable.dto.CashApplicationResponse;
 import com.artivisi.accountreceivable.dto.ChargeListItem;
 import com.artivisi.accountreceivable.dto.ChargeResponse;
 import com.artivisi.accountreceivable.entity.PaymentSchedule;
+import com.artivisi.accountreceivable.dto.CreditNoteRequest;
+import com.artivisi.accountreceivable.dto.CreditNoteResponse;
 import com.artivisi.accountreceivable.dto.InvoiceResponse;
 import com.artivisi.accountreceivable.dto.IssueInvoiceRequest;
 import com.artivisi.accountreceivable.dto.DueDateOutcome;
@@ -76,6 +78,8 @@ public class CollectionService {
     private final InvoiceRepository invoiceRepository;
     private final InstallmentRepository installmentRepository;
     private final InvoiceService invoiceService;
+    private final CreditNoteService creditNoteService;
+    private final ChargeCancellationService chargeCancellationService;
     private final GatewayConsumerClient gatewayClient;
     private final VaNumberSupplier vaNumberSupplier;
     private final NotificationService notificationService;
@@ -91,6 +95,8 @@ public class CollectionService {
                              InvoiceRepository invoiceRepository,
                              InstallmentRepository installmentRepository,
                              InvoiceService invoiceService,
+                             CreditNoteService creditNoteService,
+                             ChargeCancellationService chargeCancellationService,
                              GatewayConsumerClient gatewayClient,
                              VaNumberSupplier vaNumberSupplier,
                              NotificationService notificationService,
@@ -104,6 +110,8 @@ public class CollectionService {
         this.invoiceRepository = invoiceRepository;
         this.installmentRepository = installmentRepository;
         this.invoiceService = invoiceService;
+        this.creditNoteService = creditNoteService;
+        this.chargeCancellationService = chargeCancellationService;
         this.gatewayClient = gatewayClient;
         this.vaNumberSupplier = vaNumberSupplier;
         this.notificationService = notificationService;
@@ -224,20 +232,49 @@ public class CollectionService {
     @Transactional
     public InvoiceResponse amendAmount(String invoiceId, BigDecimal amount, String reason) {
         Invoice invoice = invoiceService.amendAmount(invoiceId, amount, reason);
-        if (invoice.isInstallment()) {
-            syncPlanCharge(invoice, "INVOICE_AMENDED");
-        } else if (invoice.isCollectible() && invoice.getOutstanding().signum() > 0) {
-            for (Charge live : chargeRepository.findByInvoiceId(invoice.getId())) {
-                if (live.getStatus() != ChargeStatus.ACTIVE || live.getAmount().compareTo(invoice.getOutstanding()) == 0) {
-                    continue;
-                }
-                gatewayClient.repriceCharge(live.getGatewayChargeId(), invoice.getOutstanding());
-                live.setAmount(invoice.getOutstanding());
-                chargeRepository.save(live);
-                contractEvents.chargeRepriced(live, invoice, "INVOICE_AMENDED");
-            }
-        }
+        carryToGateway(invoice, "INVOICE_AMENDED");
         return InvoiceResponse.from(invoice, today());
+    }
+
+    /**
+     * Issue a credit note and carry what it did to the gateway.
+     *
+     * <p>The gateway step is the whole reason this wrapper exists. A scholarship or discount recorded
+     * only in the ledger leaves a VA still asking the payer for the old amount, and someone pays it:
+     * that is how a settled bill gets paid a second time. A bill left owing nothing has its charge
+     * cancelled; one owing less has it repriced.
+     */
+    @Transactional
+    public CreditNoteResponse issueCreditNote(CreditNoteRequest request) {
+        CreditNoteResponse note = creditNoteService.issue(request);
+        Invoice invoice = invoiceRepository.findById(request.invoiceId()).orElseThrow(
+                () -> new NotFoundException("Invoice not found: " + request.invoiceId()));
+        carryToGateway(invoice, "CREDIT_NOTE");
+        return note;
+    }
+
+    /** Bring the live charges into step with what the invoice now owes. */
+    private void carryToGateway(Invoice invoice, String cause) {
+        if (!invoice.isCollectible()) {
+            return;   // cancelling the invoice already enqueued its charges
+        }
+        if (invoice.getOutstanding().signum() == 0) {
+            chargeCancellationService.enqueueForWriteOff(invoice);
+            return;
+        }
+        if (invoice.isInstallment()) {
+            syncPlanCharge(invoice, cause);
+            return;
+        }
+        for (Charge live : chargeRepository.findByInvoiceId(invoice.getId())) {
+            if (live.getStatus() != ChargeStatus.ACTIVE || live.getAmount().compareTo(invoice.getOutstanding()) == 0) {
+                continue;
+            }
+            gatewayClient.repriceCharge(live.getGatewayChargeId(), invoice.getOutstanding());
+            live.setAmount(invoice.getOutstanding());
+            chargeRepository.save(live);
+            contractEvents.chargeRepriced(live, invoice, cause);
+        }
     }
 
     /** Invoices whose live plan charge may have drifted from the plan — for the periodic sync. */

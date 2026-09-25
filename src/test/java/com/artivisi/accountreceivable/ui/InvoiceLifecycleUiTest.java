@@ -86,6 +86,7 @@ class InvoiceLifecycleUiTest extends PlaywrightTestBase {
                 .path("id");
         page.navigate(baseUrl() + "/admin/invoices/" + id);
         page.fill("#credit-note-amount", "150000");
+        page.selectOption("#credit-note-reason-code", "CORRECTION");
         page.fill("#credit-note-reason", "Koreksi tagihan");
         page.click("#btn-issue-credit-note");
         assertThat(page.locator("#flash-msg")).containsText("Nota kredit berhasil diterbitkan");
