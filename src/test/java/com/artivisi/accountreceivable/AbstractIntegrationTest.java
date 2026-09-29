@@ -29,8 +29,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * never resolve in tests.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-// A test property rather than a dynamic one, so a subclass can override it with its own.
-@TestPropertySource(properties = "ar.notification.payload-mapper=PASSTHROUGH")
+// Test properties rather than dynamic ones, so a subclass can override them with its own. A
+// @DynamicPropertySource in the base class wins over a subclass's @TestPropertySource, which makes
+// anything registered there impossible for one test to vary.
+@TestPropertySource(properties = {
+        "ar.notification.payload-mapper=PASSTHROUGH",
+        // Contract events are recorded to the outbox and never published: tests read the outbox.
+        "ar.contract.mode=OUTBOX_ONLY",
+})
 @Import(GatewayTestConfig.class)
 public abstract class AbstractIntegrationTest {
 
@@ -197,8 +203,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("ar.notification.backoff-base-seconds", () -> "0");
         registry.add("ar.notification.poll-interval-ms", () -> "3600000");
         registry.add("ar.notification.sms-enabled", () -> "false");
-        // Contract events are recorded to the outbox and never published: tests read the outbox.
-        registry.add("ar.contract.mode", () -> "OUTBOX_ONLY");
         registry.add("ar.contract.producer-name", () -> "account-receivable-test");
         registry.add("ar.contract.topics.invoice-command", () -> "invoice-command-test");
         registry.add("ar.contract.topics.debtor-command", () -> "debtor-command-test");

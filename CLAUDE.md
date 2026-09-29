@@ -157,6 +157,12 @@ as governance violations.
 - **Money is never lost.** Cash application is idempotent on the gateway payment reference; outbound
   side-effects (charge cancellation, notification publish) use a transactional outbox that retries,
   never drops.
+- **A broker outage costs the command stream, not the application.** The contract listeners start
+  from `ContractListenerStarter`, which retries, so AR boots and serves payment webhooks with Kafka
+  unreachable. It used to abort the context instead: on 2026-09-29 a dead nameserver took AR down for
+  18 minutes and the rollback failed the same way, because a deploy during a broker fault had no way
+  back. Do not make broker reachability a health indicator — the deploy gates on health, so that
+  reinstates the outage.
 - **Issued amounts are immutable.** Adjust via credit notes, not edits.
 - **Never log secrets.**
 
