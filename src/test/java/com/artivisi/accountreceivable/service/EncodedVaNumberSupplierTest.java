@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
+import com.artivisi.accountreceivable.exception.InvalidRequestException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -79,8 +81,10 @@ class EncodedVaNumberSupplierTest {
 
         assertThatThrownBy(() ->
                 supplier.allocate(new VaAllocationContext("escrow", "ref", "123", "UNKNOWN")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No VA code mapping for invoice type: UNKNOWN");
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("No VA code mapping for invoice type: UNKNOWN")
+                .extracting(e -> ((InvalidRequestException) e).getCode())
+                .isEqualTo("INVOICE_TYPE_UNKNOWN");
     }
 
     @Test
@@ -88,10 +92,15 @@ class EncodedVaNumberSupplierTest {
         var repo = repoReturning("SPP", "1");
         var supplier = new EncodedVaNumberSupplier(props("88801", 16, 2), repo);
         // debtorDigits=9; code has 10 chars
+        // An InvalidRequestException with a code, not an IllegalStateException: over the contract the
+        // difference is whether the sender is answered with invoice.rejected or with nothing at all.
+        // Three of SPMB's dev commands vanished this way on 2026-09-29.
         assertThatThrownBy(() ->
                 supplier.allocate(new VaAllocationContext("escrow", "ref", "1234567890", "SPP")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("exceeds available VA digits");
+                .isInstanceOf(InvalidRequestException.class)
+                .hasMessageContaining("does not fit the 9 digits")
+                .extracting(e -> ((InvalidRequestException) e).getCode())
+                .isEqualTo("DEBTOR_CODE_UNENCODABLE");
     }
 
     @Test

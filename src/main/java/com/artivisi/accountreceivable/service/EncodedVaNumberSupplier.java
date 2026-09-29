@@ -1,6 +1,7 @@
 package com.artivisi.accountreceivable.service;
 
 import com.artivisi.accountreceivable.config.ArGatewayProperties;
+import com.artivisi.accountreceivable.exception.InvalidRequestException;
 import com.artivisi.accountreceivable.repository.InvoiceTypeVaCodeRepository;
 import com.artivisi.accountreceivable.spi.VaAllocationContext;
 import com.artivisi.accountreceivable.spi.VaNumberSupplier;
@@ -41,18 +42,30 @@ public class EncodedVaNumberSupplier implements VaNumberSupplier {
         this.vaCodeRepository = vaCodeRepository;
     }
 
+    /**
+     * Refusals here are {@link InvalidRequestException}, not {@link IllegalStateException}.
+     *
+     * <p>They describe the request, not a broken deployment: a debtor code too long for the number
+     * space and an invoice type with no VA code are both facts about what was asked for, and asking
+     * again changes nothing. Thrown as an illegal state they surfaced as an internal failure, which
+     * over the contract means the sender is answered with nothing at all — on 2026-09-29 three of
+     * SPMB's test commands disappeared exactly this way, with their listener left waiting for an
+     * {@code invoice.rejected} that was never going to arrive. Silence is the one answer a command
+     * may never get.
+     */
     @Override
     public String allocate(VaAllocationContext ctx) {
         String typeNum = vaCodeRepository.findByInvoiceTypeCode(ctx.invoiceTypeCode())
                 .map(m -> m.getVaCode())
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new InvalidRequestException("INVOICE_TYPE_UNKNOWN",
                         "No VA code mapping for invoice type: " + ctx.invoiceTypeCode()));
 
         String debtorCode = ctx.debtorCode();
         if (debtorCode.length() > debtorDigits) {
-            throw new IllegalStateException(
+            throw new InvalidRequestException("DEBTOR_CODE_UNENCODABLE",
                     "Debtor code '" + debtorCode + "' (" + debtorCode.length()
-                            + " chars) exceeds available VA digits (" + debtorDigits + ")");
+                            + " chars) does not fit the " + debtorDigits + " digits this deployment's"
+                            + " VA number space leaves for it");
         }
 
         return vaPrefix

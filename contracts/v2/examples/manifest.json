@@ -160,6 +160,12 @@
       "rejection": "SCHEMA_INVALID"
     },
     {
+      "file": "examples/commands/debtor.upserted/valid-reserved-test-domain.json",
+      "schemaRef": "#/$defs/command.debtor.upserted",
+      "schemaValid": true,
+      "note": "Alamat uji pada domain .invalid (RFC 2606) harus diterima. Sempat ditolak SCHEMA_INVALID pada 29 September karena format email memeriksa TLD ke daftar IANA."
+    },
+    {
       "file": "examples/events/invoice.issued/valid.json",
       "schemaRef": "#/$defs/event.invoice.issued",
       "schemaValid": true

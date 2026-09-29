@@ -1,0 +1,12 @@
+{
+  "type": "debtor.upserted",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a50",
+  "occurredAt": "2026-09-29T07:00:00+07:00",
+  "producer": "spmb",
+  "payload": {
+    "debtorCode": "UJI-20260929A",
+    "name": "Pendaftar Uji",
+    "email": "uji-20260929a@example.invalid",
+    "phone": "081200000000"
+  }
+}

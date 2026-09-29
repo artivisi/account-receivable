@@ -443,8 +443,9 @@
         },
         "email": {
           "type": "string",
-          "format": "email",
-          "maxLength": 200
+          "pattern": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+          "maxLength": 200,
+          "description": "Pola, bukan format: format email pada validator kami menolak TLD yang tidak ada di daftar IANA, termasuk .invalid dan .test yang justru dianjurkan RFC 2606 untuk data uji. Pola ini berlaku sama di setiap validator, dengan atau tanpa format assertion."
         },
         "phone": {
           "type": "string",
@@ -524,6 +525,7 @@
             "REPLACED_BY_REQUIRED",
             "VA_NUMBER_BUSY",
             "REFERENCE_REQUIRED",
+            "DEBTOR_CODE_UNENCODABLE",
             "SCHEMA_INVALID"
           ]
         },
