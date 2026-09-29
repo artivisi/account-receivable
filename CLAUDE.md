@@ -96,6 +96,10 @@ carries the reduction, and the two together still show what was billed and why i
 - Where the decision comes from is the upstream app's business: a discount is a price correction
   (`invoice.amended`), a scholarship is a credit. Ask which one it is — an institution that advertises
   a discount as a "scholarship" will send the word, not the meaning.
+- An upstream app issues one over the contract as `invoice.credited`, answered by the event of the
+  same name. The event carries `invoiceAmount` (unchanged) beside `outstanding`, because after a
+  partial credit `invoiceStatus` reads `PARTIALLY_PAID` although no cash arrived — the status is
+  about what is still owed.
 
 ## Governance
 

@@ -15,9 +15,14 @@ import org.springframework.context.annotation.Primary;
 @TestConfiguration
 public class GatewayTestConfig {
 
+    /**
+     * Numeric, like every real one: the published contract types {@code vaNumber} as digits only, so a
+     * lettered stub number would let an event that no upstream validator accepts pass our tests.
+     */
     @Bean
     public VaNumberSupplier vaNumberSupplier() {
-        return (ctx) -> "VA-" + ctx.escrowCode() + "-" + Integer.toHexString(ctx.consumerReference().hashCode());
+        return (ctx) -> "8990" + String.format("%011d",
+                Math.abs((long) (ctx.escrowCode() + ":" + ctx.consumerReference()).hashCode()));
     }
 
     @Bean

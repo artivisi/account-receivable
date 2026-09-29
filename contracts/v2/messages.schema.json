@@ -17,10 +17,16 @@
       "$ref": "#/$defs/command.invoice.cancelled"
     },
     {
+      "$ref": "#/$defs/command.invoice.credited"
+    },
+    {
       "$ref": "#/$defs/command.invoice.announcementRequested"
     },
     {
       "$ref": "#/$defs/command.debtor.upserted"
+    },
+    {
+      "$ref": "#/$defs/command.charge.openRequested"
     },
     {
       "$ref": "#/$defs/event.invoice.issued"
@@ -45,6 +51,9 @@
     },
     {
       "$ref": "#/$defs/event.invoice.cancelled"
+    },
+    {
+      "$ref": "#/$defs/event.invoice.credited"
     },
     {
       "$ref": "#/$defs/event.invoice.writtenOff"
@@ -157,6 +166,15 @@
       "items": {
         "$ref": "#/$defs/planItem"
       }
+    },
+    "creditReason": {
+      "type": "string",
+      "enum": [
+        "SCHOLARSHIP",
+        "DISCOUNT",
+        "CORRECTION"
+      ],
+      "description": "SCHOLARSHIP: kewajibannya nyata dan dibayar pihak lain. DISCOUNT: harganya berkurang. CORRECTION: tagihannya salah."
     },
     "envelope": {
       "type": "object",
@@ -346,6 +364,55 @@
         ]
       }
     },
+    "payload.invoice.credited": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idempotencyKey",
+        "invoiceNumber",
+        "amount",
+        "reasonCode",
+        "reason"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "$ref": "#/$defs/idempotencyKey"
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "reasonCode": {
+          "$ref": "#/$defs/creditReason"
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Keputusan yang mendasari, misalnya nomor SK. Wajib untuk SCHOLARSHIP."
+        },
+        "reason": {
+          "$ref": "#/$defs/reasonText"
+        }
+      },
+      "if": {
+        "properties": {
+          "reasonCode": {
+            "const": "SCHOLARSHIP"
+          }
+        },
+        "required": [
+          "reasonCode"
+        ]
+      },
+      "then": {
+        "required": [
+          "reference"
+        ]
+      }
+    },
     "payload.invoice.announcementRequested": {
       "type": "object",
       "additionalProperties": false,
@@ -455,7 +522,8 @@
             "INVOICE_NOT_FOUND",
             "INVOICE_NOT_AMENDABLE",
             "REPLACED_BY_REQUIRED",
-            "VA_NUMBER_UNAVAILABLE",
+            "VA_NUMBER_BUSY",
+            "REFERENCE_REQUIRED",
             "SCHEMA_INVALID"
           ]
         },
@@ -592,7 +660,8 @@
           "enum": [
             "INVOICE_AMENDED",
             "INSTALLMENT_DUE",
-            "PLAN_AMENDED"
+            "PLAN_AMENDED",
+            "CREDIT_NOTE"
           ]
         }
       }
@@ -739,6 +808,75 @@
         }
       }
     },
+    "payload.event.invoice.credited": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "creditNoteNumber",
+        "invoiceNumber",
+        "debtorCode",
+        "amount",
+        "outstanding",
+        "invoiceStatus",
+        "reasonCode",
+        "decidedBy",
+        "decidedAt"
+      ],
+      "properties": {
+        "correlationId": {
+          "type": "string"
+        },
+        "creditNoteNumber": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "invoiceAmount": {
+          "$ref": "#/$defs/moneyPositive"
+        },
+        "outstanding": {
+          "$ref": "#/$defs/money"
+        },
+        "invoiceStatus": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "PARTIALLY_PAID",
+            "PAID"
+          ]
+        },
+        "reasonCode": {
+          "$ref": "#/$defs/creditReason"
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "reason": {
+          "$ref": "#/$defs/reasonText"
+        },
+        "decidedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decidedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
     "payload.invoice.writtenOff": {
       "type": "object",
       "additionalProperties": false,
@@ -843,6 +981,23 @@
             },
             "payload": {
               "$ref": "#/$defs/payload.invoice.cancelled"
+            }
+          }
+        }
+      ]
+    },
+    "command.invoice.credited": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.credited"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.invoice.credited"
             }
           }
         }
@@ -1013,6 +1168,23 @@
             },
             "payload": {
               "$ref": "#/$defs/payload.event.invoice.cancelled"
+            }
+          }
+        }
+      ]
+    },
+    "event.invoice.credited": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invoice.credited"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.event.invoice.credited"
             }
           }
         }

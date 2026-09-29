@@ -226,6 +226,43 @@
       "schemaRef": "#/$defs/command.charge.openRequested",
       "schemaValid": true,
       "note": "Membuka VA untuk tagihan yang diterbitkan dengan openCharge false. Ditolak VA_NUMBER_BUSY bila tagihan lain milik debitur dan jenis yang sama masih menempati nomor VA tersebut."
+    },
+    {
+      "file": "examples/commands/invoice.credited/valid-scholarship.json",
+      "schemaRef": "#/$defs/command.invoice.credited",
+      "schemaValid": true,
+      "note": "Beasiswa sungguhan: tagihan tetap penuh, nota kredit menutup sisanya, dan charge-nya dibatalkan karena tidak ada lagi yang ditagih."
+    },
+    {
+      "file": "examples/commands/invoice.credited/valid-correction-without-reference.json",
+      "schemaRef": "#/$defs/command.invoice.credited",
+      "schemaValid": true,
+      "note": "reference hanya wajib untuk SCHOLARSHIP."
+    },
+    {
+      "file": "examples/commands/invoice.credited/invalid-scholarship-without-reference.json",
+      "schemaRef": "#/$defs/command.invoice.credited",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID",
+      "note": "Skema menolaknya lebih dahulu; pengirim yang melewatkan validasi skema mendapat REFERENCE_REQUIRED dari AR."
+    },
+    {
+      "file": "examples/commands/invoice.credited/rejected-exceeds-outstanding.json",
+      "schemaRef": "#/$defs/command.invoice.credited",
+      "schemaValid": true,
+      "rejection": "AMOUNT_INVALID",
+      "note": "Lolos skema; ditolak AR karena nilai nota kredit melebihi sisa tagihan."
+    },
+    {
+      "file": "examples/events/invoice.credited/valid.json",
+      "schemaRef": "#/$defs/event.invoice.credited",
+      "schemaValid": true
+    },
+    {
+      "file": "examples/events/invoice.rejected/valid-va-number-busy.json",
+      "schemaRef": "#/$defs/event.invoice.rejected",
+      "schemaValid": true,
+      "note": "Penolakan charge.openRequested: nomor VA-nya masih menagih tagihan lain milik debitur dan jenis yang sama."
     }
   ]
 }

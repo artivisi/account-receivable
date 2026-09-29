@@ -1,6 +1,7 @@
 package com.artivisi.accountreceivable.contract;
 
 import com.artivisi.accountreceivable.config.ArContractProperties;
+import com.artivisi.accountreceivable.dto.CreditNoteResponse;
 import com.artivisi.accountreceivable.entity.CashApplication;
 import com.artivisi.accountreceivable.entity.Charge;
 import com.artivisi.accountreceivable.entity.ContractEventOutbox;
@@ -99,6 +100,33 @@ public class ContractEventService {
         ObjectNode p = disposition(invoice, reason, decidedBy);
         putNullable(p, "replacedBy", replacedBy);
         return enqueue(properties.topics().invoiceEvent(), invoice.getDebtor().getCode(), "invoice.cancelled", p);
+    }
+
+    /**
+     * A credit note the upstream asked for, answered on the event topic.
+     *
+     * <p>Carries what the invoice is worth <em>after</em> the credit, because that is the whole point
+     * of the message: the sender has to stop showing the payer an amount nobody will collect. The
+     * invoice's own amount is unchanged and reported as {@code invoiceAmount} — a credit note never
+     * edits an issued figure, it stands beside it.
+     */
+    public String invoiceCredited(Invoice invoice, CreditNoteResponse note, String correlationId,
+                                  String decidedBy) {
+        ObjectNode p = JSON.createObjectNode();
+        putNullable(p, "correlationId", correlationId);
+        p.put("creditNoteNumber", note.creditNoteNumber());
+        putInvoiceNumbers(p, invoice);
+        p.put("debtorCode", invoice.getDebtor().getCode());
+        p.put("amount", money(note.amount()));
+        p.put("invoiceAmount", money(invoice.getAmount()));
+        p.put("outstanding", money(invoice.getOutstanding()));
+        p.put("invoiceStatus", invoice.getPaymentStatus().name());
+        p.put("reasonCode", note.reasonCode().name());
+        putNullable(p, "reference", note.reference());
+        putNullable(p, "reason", note.reason());
+        p.put("decidedBy", decidedBy);
+        p.put("decidedAt", now());
+        return enqueue(properties.topics().invoiceEvent(), invoice.getDebtor().getCode(), "invoice.credited", p);
     }
 
     public String invoiceWrittenOff(Invoice invoice, String reason, String decidedBy) {
@@ -258,10 +286,17 @@ public class ContractEventService {
         return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(OffsetDateTime.now(clock));
     }
 
+    /**
+     * Writes an optional field, or leaves it out entirely when there is nothing to say.
+     *
+     * <p>Leaves it out rather than writing {@code null}: every optional field in the published schema
+     * is typed (a string with {@code minLength}, an invoice number), and {@code additionalProperties}
+     * is false, so an explicit null makes the event fail the very schema the upstream teams validate
+     * against. It used to emit nulls, which meant {@code invoice.issued} from an announcement and
+     * {@code invoice.cancelled} for any reason but SUPERSEDED were both unvalidatable.
+     */
     private static void putNullable(ObjectNode node, String field, String value) {
-        if (value == null) {
-            node.putNull(field);
-        } else {
+        if (value != null) {
             node.put(field, value);
         }
     }

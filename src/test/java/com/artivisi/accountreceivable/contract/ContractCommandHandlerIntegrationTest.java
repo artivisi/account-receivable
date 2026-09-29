@@ -15,6 +15,11 @@ import com.artivisi.accountreceivable.support.ApiClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SchemaLocation;
+import com.networknt.schema.SchemaValidatorsConfig;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +42,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String SCHEMA_ID = "https://artivisi.com/contracts/account-receivable/v2/messages.schema.json";
+    private static final JsonSchemaFactory SCHEMAS = JsonSchemaFactory.getInstance(
+            SpecVersion.VersionFlag.V202012,
+            builder -> builder.schemaMappers(mappers -> mappers.mapPrefix(
+                    "https://artivisi.com/contracts/account-receivable/v2/",
+                    Path.of("contracts", "v2").toAbsolutePath().toUri().toString())));
+    private static final SchemaValidatorsConfig SCHEMA_CONFIG =
+            SchemaValidatorsConfig.builder().formatAssertionsEnabled(true).build();
     private static final Path EXAMPLES = Path.of("contracts", "v2", "examples");
     private static final String DEBTOR = "2600000001";
 
@@ -116,9 +130,31 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         return JSON.readTree(message).get("payload").get("idempotencyKey").asText();
     }
 
+    /**
+     * The events a command produced — each one first validated against the published schema.
+     *
+     * <p>Validating here rather than in a test of its own is deliberate: every flow in this class
+     * then checks the shape of what it emits for free, and a field that drifts from the contract
+     * fails in our build instead of in an upstream team's listener. It caught AR writing an explicit
+     * {@code null} for optional fields the schema types as strings.
+     */
     private List<ContractEventOutbox> eventsFor(String key, int after) {
         List<ContractEventOutbox> all = outbox.findByMessageKeyOrderByCreatedAtAsc(key);
-        return all.subList(after, all.size());
+        List<ContractEventOutbox> produced = all.subList(after, all.size());
+        for (ContractEventOutbox row : produced) {
+            assertThat(validate(row)).as("%s does not match the published schema: %s",
+                    row.getEventType(), row.getPayload()).isEmpty();
+        }
+        return produced;
+    }
+
+    private static Set<ValidationMessage> validate(ContractEventOutbox row) {
+        try {
+            return SCHEMAS.getSchema(SchemaLocation.of(SCHEMA_ID + "#/$defs/event." + row.getEventType()),
+                    SCHEMA_CONFIG).validate(JSON.readTree(row.getPayload()));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static JsonNode payloadOf(ContractEventOutbox row) throws IOException {
@@ -133,6 +169,25 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(events).extracting(ContractEventOutbox::getEventType)
                 .containsExactly("invoice.issued", "invoice.planAmended", "charge.opened");
         return payloadOf(events.get(0)).get("invoiceNumber").asText();
+    }
+
+    /** A credit command with a fresh key, aimed at one invoice, for one amount. */
+    private static String creditOf(String fixture, String invoiceNumber, String amount) throws IOException {
+        ObjectNode root = (ObjectNode) JSON.readTree(fixture("commands/invoice.credited/" + fixture));
+        ObjectNode payload = (ObjectNode) root.get("payload");
+        payload.put("idempotencyKey", payload.get("idempotencyKey").asText() + ":" + UUID.randomUUID());
+        payload.put("invoiceNumber", invoiceNumber);
+        if (amount != null) {
+            payload.put("amount", amount);
+        }
+        return JSON.writeValueAsString(root);
+    }
+
+    private String issueSingle() throws IOException {
+        String message = fixture("commands/invoice.requested/valid-single-payment.json", null);
+        int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+        handler.handle("invoice-command", message);
+        return payloadOf(eventsFor(DEBTOR, before).get(0)).get("invoiceNumber").asText();
     }
 
     // ------------------------------------------------------------------ tests
@@ -373,5 +428,82 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(payloadOf(events.get(0)).get("reason").asText()).isEqualTo("INVOICE_AMENDED");
         assertThat(payloadOf(events.get(1)).get("amount").asText()).isEqualTo("5000000.00");
         assertThat(gatewayRepriceCount()).isEqualTo(repricesBefore + 1);
+    }
+
+    @Test
+    void creditedInFull_settlesTheInvoiceWithoutCash_andStopsTheVaAskingForMoney() throws IOException {
+        String invoiceNumber = issueSingle();
+        resetGatewayCancelStub();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", creditOf("valid-scholarship.json", invoiceNumber, "6500000.00"));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.credited");
+        JsonNode p = payloadOf(events.getFirst());
+        assertThat(p.get("amount").asText()).isEqualTo("6500000.00");
+        // The invoice is worth what it always was; the credit note stands beside it.
+        assertThat(p.get("invoiceAmount").asText()).isEqualTo("6500000.00");
+        assertThat(p.get("outstanding").asText()).isEqualTo("0.00");
+        assertThat(p.get("invoiceStatus").asText()).isEqualTo("PAID");
+        assertThat(p.get("reasonCode").asText()).isEqualTo("SCHOLARSHIP");
+        assertThat(p.get("reference").asText()).isEqualTo("SK-042/BEASISWA/2026");
+        assertThat(p.get("creditNoteNumber").asText()).isNotBlank();
+
+        // A bill settled by a scholarship must stop being payable, or the payer pays a debt nobody owes.
+        cancellationDispatcher.dispatchDue();
+        assertThat(gatewayCancelCount()).isEqualTo(1);
+        String invoiceId = invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getId();
+        assertThat(chargeRepository.findByInvoiceId(invoiceId))
+                .allMatch(c -> c.getStatus() == ChargeStatus.CANCELLED);
+    }
+
+    @Test
+    void creditedInPart_repricesTheVaToWhatIsLeft() throws IOException {
+        String invoiceNumber = issueSingle();
+        int repricesBefore = gatewayRepriceCount();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", creditOf("valid-correction-without-reference.json", invoiceNumber, "500000.00"));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType)
+                .containsExactly("charge.repriced", "invoice.credited");
+        assertThat(payloadOf(events.get(0)).get("amount").asText()).isEqualTo("6000000.00");
+        JsonNode credited = payloadOf(events.get(1));
+        assertThat(credited.get("outstanding").asText()).isEqualTo("6000000.00");
+        // PARTIALLY_PAID although nobody paid: the status tracks what is still owed, not what was
+        // collected. A consumer reading this as a payment would invent cash — which is why the event
+        // carries outstanding and invoiceAmount, and why collection reports read cash applications.
+        assertThat(credited.get("invoiceStatus").asText()).isEqualTo("PARTIALLY_PAID");
+        assertThat(credited.has("reference")).isFalse();
+        assertThat(gatewayRepriceCount()).isEqualTo(repricesBefore + 1);
+    }
+
+    @Test
+    void creditExceedingWhatIsOwed_isRejected_andChangesNothing() throws IOException {
+        String invoiceNumber = issueSingle();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", creditOf("rejected-exceeds-outstanding.json", invoiceNumber, "9000000.00"));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("AMOUNT_INVALID");
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getOutstanding())
+                .isEqualByComparingTo("6500000.00");
+    }
+
+    @Test
+    void scholarshipWithoutTheDecisionItRestsOn_isRefusedAtTheDoor() throws IOException {
+        String invoiceNumber = issueSingle();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command",
+                creditOf("invalid-scholarship-without-reference.json", invoiceNumber, null));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("SCHEMA_INVALID");
     }
 }

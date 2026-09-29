@@ -20,7 +20,7 @@ import java.time.LocalDate;
 
 /**
  * Issues credit notes against issued invoices. The invoice amount stays immutable; the credit note
- * reduces {@code outstanding} and posts a reversing journal (Dr Revenue · Cr A/R control).
+ * reduces {@code outstanding} and stands beside the invoice as the reason it was not collected.
  *
  * <p>Issue it through {@code CollectionService.issueCreditNote} rather than here directly: a bill
  * that no longer owes anything must also stop being payable at the bank, and this service does not
@@ -66,11 +66,12 @@ public class CreditNoteService {
                     + " decision it rests on in reference (e.g. the decree number)");
         }
         if (invoice.getPaymentStatus() == PaymentStatus.WRITTEN_OFF) {
-            throw new InvalidRequestException("Cannot credit a written-off invoice");
+            throw new InvalidRequestException("INVOICE_NOT_AMENDABLE",
+                    "Cannot credit a written-off invoice");
         }
         BigDecimal amount = exactMoney(request.amount());
         if (amount.compareTo(invoice.getOutstanding()) > 0) {
-            throw new InvalidRequestException(
+            throw new InvalidRequestException("AMOUNT_INVALID",
                     "Credit note " + amount + " exceeds outstanding " + invoice.getOutstanding());
         }
 
@@ -102,7 +103,7 @@ public class CreditNoteService {
 
     private static BigDecimal exactMoney(BigDecimal value) {
         if (value.stripTrailingZeros().scale() > 2) {
-            throw new InvalidRequestException("amount has sub-cent precision: " + value);
+            throw new InvalidRequestException("AMOUNT_INVALID", "amount has sub-cent precision: " + value);
         }
         return value.setScale(2);
     }

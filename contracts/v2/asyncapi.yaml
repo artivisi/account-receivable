@@ -27,7 +27,9 @@ channels:
       invoice.amended: { $ref: '#/components/messages/invoice.amended' }
       invoice.planAmended: { $ref: '#/components/messages/invoice.planAmended' }
       invoice.cancelled: { $ref: '#/components/messages/invoice.cancelled' }
+      invoice.credited: { $ref: '#/components/messages/invoice.credited' }
       invoice.announcementRequested: { $ref: '#/components/messages/invoice.announcementRequested' }
+      charge.openRequested: { $ref: '#/components/messages/charge.openRequested' }
   debtorCommand:
     address: debtor-command-v2
     description: Pendaftaran dan pembaruan debitur. Key = debtorCode.
@@ -44,6 +46,7 @@ channels:
       invoice.rejected: { $ref: '#/components/messages/invoice.rejected' }
       invoice.planAmended: { $ref: '#/components/messages/event.invoice.planAmended' }
       invoice.cancelled: { $ref: '#/components/messages/event.invoice.cancelled' }
+      invoice.credited: { $ref: '#/components/messages/event.invoice.credited' }
       invoice.writtenOff: { $ref: '#/components/messages/invoice.writtenOff' }
       charge.opened: { $ref: '#/components/messages/charge.opened' }
       charge.repriced: { $ref: '#/components/messages/charge.repriced' }
@@ -76,12 +79,15 @@ components:
     invoice.amended:                { name: invoice.amended, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.amended' } }
     invoice.planAmended:            { name: invoice.planAmended, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.planAmended' } }
     invoice.cancelled:              { name: invoice.cancelled, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.cancelled' } }
+    invoice.credited:               { name: invoice.credited, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.credited' } }
     invoice.announcementRequested:  { name: invoice.announcementRequested, payload: { $ref: 'messages.schema.json#/$defs/command.invoice.announcementRequested' } }
+    charge.openRequested:           { name: charge.openRequested, payload: { $ref: 'messages.schema.json#/$defs/command.charge.openRequested' } }
     debtor.upserted:                { name: debtor.upserted, payload: { $ref: 'messages.schema.json#/$defs/command.debtor.upserted' } }
     invoice.issued:                 { name: invoice.issued, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.issued' } }
     invoice.rejected:               { name: invoice.rejected, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.rejected' } }
     event.invoice.planAmended:      { name: invoice.planAmended, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.planAmended' } }
     event.invoice.cancelled:        { name: invoice.cancelled, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.cancelled' } }
+    event.invoice.credited:         { name: invoice.credited, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.credited' } }
     invoice.writtenOff:             { name: invoice.writtenOff, payload: { $ref: 'messages.schema.json#/$defs/event.invoice.writtenOff' } }
     charge.opened:                  { name: charge.opened, payload: { $ref: 'messages.schema.json#/$defs/event.charge.opened' } }
     charge.repriced:                { name: charge.repriced, payload: { $ref: 'messages.schema.json#/$defs/event.charge.repriced' } }

@@ -1,0 +1,13 @@
+{
+  "type": "invoice.credited",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a42",
+  "occurredAt": "2026-09-29T10:16:00+07:00",
+  "producer": "spmb",
+  "payload": {
+    "idempotencyKey": "spmb:beasiswa:2600000003:1",
+    "invoiceNumber": "2026082701999003",
+    "amount": "2500000.00",
+    "reasonCode": "SCHOLARSHIP",
+    "reason": "Beasiswa yatim"
+  }
+}

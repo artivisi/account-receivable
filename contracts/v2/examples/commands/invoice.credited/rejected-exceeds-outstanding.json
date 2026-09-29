@@ -1,0 +1,14 @@
+{
+  "type": "invoice.credited",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a43",
+  "occurredAt": "2026-09-29T10:18:00+07:00",
+  "producer": "spmb",
+  "payload": {
+    "idempotencyKey": "spmb:beasiswa:2600000004:1",
+    "invoiceNumber": "2026082701999004",
+    "amount": "9000000.00",
+    "reasonCode": "SCHOLARSHIP",
+    "reference": "SK-051/BEASISWA/2026",
+    "reason": "Beasiswa penuh"
+  }
+}

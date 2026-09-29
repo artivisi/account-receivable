@@ -1,10 +1,13 @@
 package com.artivisi.accountreceivable.contract;
 
 import com.artivisi.accountreceivable.config.ArContractProperties;
+import com.artivisi.accountreceivable.dto.CreditNoteRequest;
+import com.artivisi.accountreceivable.dto.CreditNoteResponse;
 import com.artivisi.accountreceivable.dto.DebtorRequest;
 import com.artivisi.accountreceivable.dto.IssueInvoiceRequest;
 import com.artivisi.accountreceivable.entity.Charge;
 import com.artivisi.accountreceivable.entity.ChargeStatus;
+import com.artivisi.accountreceivable.entity.CreditReason;
 import com.artivisi.accountreceivable.entity.Debtor;
 import com.artivisi.accountreceivable.entity.DebtorStatus;
 import com.artivisi.accountreceivable.entity.Invoice;
@@ -77,6 +80,7 @@ public class ContractCommandService {
                 case "invoice.amended" -> invoiceAmended(payload);
                 case "invoice.planAmended" -> planAmended(payload, producer);
                 case "invoice.cancelled" -> invoiceCancelled(payload, producer);
+                case "invoice.credited" -> invoiceCredited(payload, producer);
                 case "invoice.announcementRequested" -> announcementRequested(payload);
                 case "charge.openRequested" -> chargeOpenRequested(payload);
                 case "debtor.upserted" -> debtorUpserted(payload);
@@ -175,6 +179,37 @@ public class ContractCommandService {
         String note = p.hasNonNull("note") ? p.get("note").asText() : null;
         return new CommandResult(invoice.getDebtor().getCode(),
                 invoiceService.cancel(invoice.getId(), reason, replacedBy, note, producer));
+    }
+
+    /**
+     * Record a credit note the upstream decided on: a scholarship someone else settles, a discount,
+     * or a correction of a bill that was wrong.
+     *
+     * <p>Goes through {@link CollectionService#issueCreditNote}, never {@code CreditNoteService},
+     * because a bill that now owes nothing must also stop being payable at the bank — otherwise the
+     * VA keeps asking for the old amount and gets paid a second time.
+     *
+     * <p>The reduction is deliberately not an {@code invoice.amended}: an amendment says the price
+     * changed, a credit note says the debt was settled without money. Only the second keeps the
+     * scholarship visible in what the institution gave away, and only the second leaves reports of
+     * cash collected alone.
+     */
+    private CommandResult invoiceCredited(JsonNode p, String producer) {
+        Invoice invoice = load(p.get("invoiceNumber").asText());
+        CreditReason reasonCode;
+        try {
+            reasonCode = CreditReason.valueOf(p.get("reasonCode").asText());
+        } catch (IllegalArgumentException e) {
+            throw new ContractRejectedException("SCHEMA_INVALID",
+                    "reasonCode " + p.get("reasonCode").asText() + " is not one of " + List.of(CreditReason.values()));
+        }
+        CreditNoteResponse note = collectionService.issueCreditNote(new CreditNoteRequest(
+                invoice.getId(), new BigDecimal(p.get("amount").asText()), reasonCode,
+                p.hasNonNull("reference") ? p.get("reference").asText() : null,
+                p.get("reason").asText()));
+        Invoice after = invoiceRepository.findById(invoice.getId()).orElseThrow();
+        return new CommandResult(after.getDebtor().getCode(),
+                events.invoiceCredited(after, note, p.get("idempotencyKey").asText(), producer));
     }
 
     /**

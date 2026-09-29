@@ -1,0 +1,11 @@
+{
+  "type": "invoice.rejected",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a45",
+  "occurredAt": "2026-09-10T09:15:02+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "correlationId": "spmb:buka-va:2600000001:2",
+    "code": "VA_NUMBER_BUSY",
+    "reason": "VA 8990012600000001 is still collecting invoice 2026082701999001; that invoice must be paid or cancelled before 2026082701999002 can be collected on the same number"
+  }
+}

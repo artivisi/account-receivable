@@ -37,6 +37,27 @@ dengan `$ref` ke `messages.schema.json#/$defs/command.<type>`.
 - **Jenis message yang tidak dikenal** pada sebuah topic adalah error di sisi consumer, bukan
   sesuatu yang dilewati.
 
+## Nota kredit: `invoice.credited`
+
+Pengurangan tagihan ada dua jenis, dan keduanya tidak boleh tertukar:
+
+| Yang terjadi | Perintah | Akibat pada tagihan |
+|---|---|---|
+| Harganya berubah (potongan, koreksi harga) | `invoice.amended` | Nominal tagihan berubah |
+| Kewajibannya tetap, ditutup tanpa uang (beasiswa) | `invoice.credited` | Nominal tagihan tetap; sisa tagihan berkurang |
+
+`reasonCode` wajib: `SCHOLARSHIP`, `DISCOUNT`, atau `CORRECTION`. `SCHOLARSHIP` juga wajib membawa
+`reference`, yaitu keputusan yang mendasarinya — beasiswa yang tidak dapat ditelusuri ke sebuah SK
+tidak dapat dibedakan dari kesalahan input.
+
+VA-nya menyesuaikan dengan sendirinya: sisa tagihan nol maka charge dibatalkan (`charge.cancelled`),
+masih ada sisa maka charge diturunkan nominalnya (`charge.repriced` dengan `reason: CREDIT_NOTE`).
+Tanpa itu, tagihan yang sudah ditutup beasiswa tetap ditagih VA-nya dan dibayar untuk kedua kalinya.
+
+Sesudah nota kredit sebagian, `invoiceStatus` pada event bernilai `PARTIALLY_PAID` walaupun tidak ada
+uang yang masuk: status menyatakan sisa kewajiban, bukan kas yang diterima. Laporan penerimaan kas
+membaca pembayaran, bukan status tagihan.
+
 ## Nilai contoh
 
 Seluruh kode debitur, nomor tagihan, dan nomor VA dalam `examples/` adalah nilai rekaan yang
