@@ -143,6 +143,60 @@ class InstallmentCollectionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void amendPlan_keepsWhatAPartPaidLegReceived_andReplacesOnlyItsRemainder() {
+        LocalDate first = LocalDate.now().plusDays(10);
+        String invoiceId = seedPlan("plan-hardship", first, LocalDate.now().plusDays(40), LocalDate.now().plusDays(70));
+        api.openCharge(invoiceId);
+        String firstLegId = given().when().get("/api/invoices/{id}", invoiceId).then().extract().path("installments[0].id");
+        // A family in hardship pays what it can at the cashier; the upstream app approves a new
+        // schedule for the rest.
+        given().contentType("application/json").body(Map.of("amount", 500_000))
+                .when().post("/api/installments/{id}/payments", firstLegId).then().statusCode(200)
+                .body("installments[0].paymentStatus", equalTo("PARTIALLY_PAID"));
+
+        api.amendPlan(invoiceId, List.of(
+                        ApiClient.installment(LocalDate.now().plusDays(40), 1_500_000),
+                        ApiClient.installment(LocalDate.now().plusDays(100), 4_000_000)),
+                "Keringanan disetujui")
+                .then().statusCode(200)
+                .body("installments.size()", equalTo(3))
+                .body("installments[0].id", equalTo(firstLegId))
+                .body("installments[0].sequence", equalTo(1))
+                .body("installments[0].amount", equalTo(500_000.0F))
+                .body("installments[0].paymentStatus", equalTo("PAID"))
+                .body("installments[0].dueDate", equalTo(first.toString()))
+                .body("installments[1].sequence", equalTo(2))
+                .body("installments[2].sequence", equalTo(3))
+                .body("outstanding", equalTo(5_500_000.0F));
+
+        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("1500000");
+    }
+
+    @Test
+    void amendPlan_afterACreditSettledTheLastLeg_numbersTheNewLegsAfterIt() {
+        // A credit note settles a plan from its END, so the paid leg is not a prefix: the new legs
+        // must not reuse its sequence.
+        String invoiceId = seedPlan("plan-credit", LocalDate.now().plusDays(10), LocalDate.now().plusDays(40),
+                LocalDate.now().plusDays(70));
+        api.creditNote(invoiceId, 2_500_000, "DISCOUNT", "Potongan sebagian");
+
+        api.amendPlan(invoiceId, List.of(
+                        ApiClient.installment(LocalDate.now().plusDays(20), 1_000_000),
+                        ApiClient.installment(LocalDate.now().plusDays(50), 1_000_000),
+                        ApiClient.installment(LocalDate.now().plusDays(80), 1_500_000)),
+                "Jadwal ulang setelah potongan")
+                .then().statusCode(200)
+                // The credit walked back from the end: leg 3 fully, then 500.000 of leg 2. Leg 2 is
+                // split, so both survive as paid legs and the three new legs follow them.
+                .body("installments.size()", equalTo(5))
+                .body("installments.findAll { it.paymentStatus == 'PAID' }.amount.sort()",
+                        equalTo(List.of(500_000.0F, 2_000_000.0F)))
+                .body("installments.findAll { it.paymentStatus == 'PARTIALLY_PAID' }.size()", equalTo(0))
+                .body("installments.sequence.sort()", equalTo(List.of(1, 2, 3, 4, 5)))
+                .body("outstanding", equalTo(3_500_000.0F));
+    }
+
+    @Test
     void amendPlan_refusesLegsThatDoNotSumToTheOutstanding() {
         String invoiceId = seedPlan("plan-sum", LocalDate.now().plusDays(10), LocalDate.now().plusDays(40));
         api.amendPlan(invoiceId, List.of(ApiClient.installment(LocalDate.now().plusDays(40), 1_000_000)), "salah")

@@ -226,9 +226,12 @@ public class InvoiceService {
      * the new legs must sum to what is still outstanding, so the debt itself never changes here —
      * only when it is due.
      *
-     * <p>Refused while any installment is part-paid: a manual receipt that settled half a leg
-     * cannot be carried into a new plan without deciding which new leg it belongs to, and that is a
-     * decision for a person, made by reversing or completing the receipt first.
+     * <p>A part-paid installment is split: what it has received stays behind as a paid leg on its
+     * original date, and only its remainder is replaced. Part payment is an ordinary hardship path — a
+     * parent laid off, a house lost to fire or flood — and the decision to reschedule what is left
+     * is made and approved in the upstream app by whoever holds that authority. By the time the
+     * amendment reaches AR it is a decision, not a request to judge, so AR records it rather than
+     * refusing it.
      */
     @Transactional
     public Invoice amendPlan(String invoiceId, List<IssueInvoiceRequest.InstallmentRequest> legs, String reason) {
@@ -255,8 +258,9 @@ public class InvoiceService {
                 .reduce((a, b) -> a + "," + b).orElse("-");
         for (Installment leg : schedule.getInstallments()) {
             if (leg.getPaymentStatus() == PaymentStatus.PARTIALLY_PAID) {
-                throw new InvalidRequestException("PLAN_INVALID", "Installment " + leg.getSequence()
-                        + " is part-paid; complete or reverse that receipt before amending the plan");
+                leg.setAmount(leg.getAmount().subtract(leg.getOutstanding()));
+                leg.setOutstanding(BigDecimal.ZERO.setScale(2));
+                leg.setPaymentStatus(PaymentStatus.PAID);
             }
         }
         List<Installment> kept = new java.util.ArrayList<>(schedule.getInstallments().stream()
@@ -270,6 +274,25 @@ public class InvoiceService {
         // orphan deletes, and a new leg would collide with the old one on (schedule, sequence).
         installmentRepository.deleteAll(replaced);
         installmentRepository.flush();
+        // The paid legs keep their order but close up to 1..k, so the new legs can follow them.
+        // A paid leg need not be a prefix — a credit note settles legs from the END of a plan — and
+        // numbering the new legs after kept.size() would then collide with it. Renumber through
+        // negatives with a flush between: the constraint is not deferrable, and Hibernate would
+        // otherwise insert the new legs before updating the old ones.
+        boolean contiguous = true;
+        for (int i = 0; i < kept.size(); i++) {
+            contiguous &= kept.get(i).getSequence() == i + 1;
+        }
+        if (!contiguous) {
+            for (int i = 0; i < kept.size(); i++) {
+                kept.get(i).setSequence(-(i + 1));
+            }
+            installmentRepository.flush();
+            for (int i = 0; i < kept.size(); i++) {
+                kept.get(i).setSequence(i + 1);
+            }
+            installmentRepository.flush();
+        }
 
         LocalDate today = today();
         BigDecimal total = BigDecimal.ZERO;
