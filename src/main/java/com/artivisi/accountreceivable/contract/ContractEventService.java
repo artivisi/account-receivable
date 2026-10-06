@@ -74,7 +74,8 @@ public class ContractEventService {
                 "invoice.rejected", p);
     }
 
-    public String planAmended(Invoice invoice, String correlationId, String reason, String decidedBy) {
+    public String planAmended(Invoice invoice, String correlationId, String reason, String reference,
+                              String decidedBy) {
         ObjectNode p = JSON.createObjectNode();
         putNullable(p, "correlationId", correlationId);
         putInvoiceNumbers(p, invoice);
@@ -91,14 +92,17 @@ public class ContractEventService {
             l.put("status", leg.getPaymentStatus().name());
         }
         p.put("reason", reason);
+        putNullable(p, "reference", reference);
         p.put("decidedBy", decidedBy);
         p.put("decidedAt", now());
         return enqueue(properties.topics().invoiceEvent(), invoice.getDebtor().getCode(), "invoice.planAmended", p);
     }
 
-    public String invoiceCancelled(Invoice invoice, String reason, String replacedBy, String decidedBy) {
+    public String invoiceCancelled(Invoice invoice, String reason, String replacedBy, String reference,
+                                   String decidedBy) {
         ObjectNode p = disposition(invoice, reason, decidedBy);
         putNullable(p, "replacedBy", replacedBy);
+        putNullable(p, "reference", reference);
         return enqueue(properties.topics().invoiceEvent(), invoice.getDebtor().getCode(), "invoice.cancelled", p);
     }
 

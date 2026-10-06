@@ -7,6 +7,7 @@
     "idempotencyKey": "aplikasi-akademik:batal:2600000001:20262",
     "invoiceNumber": "2026082740999001",
     "reason": "SUPERSEDED",
+    "reference": "KNV-2026-0007",
     "replacedBy": "2026082740999002",
     "note": "Nominal salah input, diterbitkan ulang"
   }

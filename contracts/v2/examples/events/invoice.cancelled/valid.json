@@ -9,6 +9,7 @@
     "amount": "6500000.00",
     "outstandingAtDecision": "4333333.00",
     "reason": "SUPERSEDED",
+    "reference": "KNV-2026-0007",
     "replacedBy": "2026082740999002",
     "decidedBy": "aplikasi-akademik",
     "decidedAt": "2026-08-27T16:02:41+07:00"

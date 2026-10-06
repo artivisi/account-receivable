@@ -132,7 +132,7 @@ public class InvoiceService {
         // admin form — so an upstream's mirror never depends on which one was used.
         contractEvents.invoiceIssued(saved, request.correlationId());
         if (saved.isInstallment()) {
-            contractEvents.planAmended(saved, request.correlationId(), "ISSUED", "ar");
+            contractEvents.planAmended(saved, request.correlationId(), "ISSUED", null, "ar");
         }
         return InvoiceResponse.from(saved, today());
     }
@@ -234,7 +234,8 @@ public class InvoiceService {
      * refusing it.
      */
     @Transactional
-    public Invoice amendPlan(String invoiceId, List<IssueInvoiceRequest.InstallmentRequest> legs, String reason) {
+    public Invoice amendPlan(String invoiceId, List<IssueInvoiceRequest.InstallmentRequest> legs, String reason,
+                             String reference) {
         if (reason == null || reason.isBlank()) {
             throw new InvalidRequestException("PLAN_INVALID", "A plan amendment reason is required");
         }
@@ -322,7 +323,8 @@ public class InvoiceService {
         invoice.setDueDate(schedule.lastDueDate());
         rollUpSchedule(invoice);
         auditService.record("INVOICE_PLAN_AMENDED", "Invoice", invoice.getId(),
-                invoice.getInvoiceNumber() + " reason=" + reason + " previous=[" + previousPlan + "]");
+                invoice.getInvoiceNumber() + " reason=" + reason + (reference != null ? " reference=" + reference : "")
+                        + " previous=[" + previousPlan + "]");
         return invoice;
     }
 
@@ -333,7 +335,8 @@ public class InvoiceService {
      * Its charges are cancelled at the gateway through the same outbox a write-off uses.
      */
     @Transactional
-    public String cancel(String invoiceId, String reason, String replacedBy, String note, String decidedBy) {
+    public String cancel(String invoiceId, String reason, String replacedBy, String note, String reference,
+                         String decidedBy) {
         if (reason == null || reason.isBlank()) {
             throw new InvalidRequestException("INVOICE_NOT_AMENDABLE", "A cancellation reason is required");
         }
@@ -342,7 +345,7 @@ public class InvoiceService {
             throw new InvalidRequestException("INVOICE_NOT_AMENDABLE",
                     "Cannot cancel invoice " + invoice.getInvoiceNumber() + " in status " + invoice.getPaymentStatus());
         }
-        String event = contractEvents.invoiceCancelled(invoice, reason, replacedBy, decidedBy);
+        String event = contractEvents.invoiceCancelled(invoice, reason, replacedBy, reference, decidedBy);
         invoice.setPaymentStatus(PaymentStatus.CANCELLED);
         if (invoice.isInstallment()) {
             for (Installment leg : invoice.getSchedule().getInstallments()) {
@@ -356,7 +359,7 @@ public class InvoiceService {
         auditService.record("INVOICE_CANCELLED", "Invoice", invoice.getId(),
                 invoice.getInvoiceNumber() + " reason=" + reason
                         + (replacedBy != null ? " replacedBy=" + replacedBy : "")
-                        + (note != null ? " note=" + note : "") + " by=" + decidedBy);
+                        + (note != null ? " note=" + note : "") + (reference != null ? " reference=" + reference : "") + " by=" + decidedBy);
         return event;
     }
 
@@ -369,7 +372,7 @@ public class InvoiceService {
      * has already been told about keep their figures.
      */
     @Transactional
-    public Invoice amendAmount(String invoiceId, BigDecimal newAmount, String reason) {
+    public Invoice amendAmount(String invoiceId, BigDecimal newAmount, String reason, String reference) {
         Invoice invoice = load(invoiceId);
         if (!invoice.isCollectible() || invoice.getOutstanding().signum() == 0) {
             throw new InvalidRequestException("INVOICE_NOT_AMENDABLE",
@@ -382,7 +385,7 @@ public class InvoiceService {
                     + " is below what has already been paid (" + paid + ") on " + invoice.getInvoiceNumber());
         }
         if (amount.signum() == 0) {
-            cancel(invoiceId, "AMENDED_TO_ZERO", null, reason, "ar");
+            cancel(invoiceId, "AMENDED_TO_ZERO", null, reason, reference, "ar");
             return invoice;
         }
         BigDecimal previous = invoice.getAmount();
@@ -407,7 +410,7 @@ public class InvoiceService {
             invoice.recomputeEarliestUnpaidDueDate();
         }
         auditService.record("INVOICE_AMOUNT_AMENDED", "Invoice", invoice.getId(),
-                invoice.getInvoiceNumber() + " from=" + previous + " to=" + amount + " reason=" + reason);
+                invoice.getInvoiceNumber() + " from=" + previous + " to=" + amount + " reason=" + reason + (reference != null ? " reference=" + reference : ""));
         return invoice;
     }
 

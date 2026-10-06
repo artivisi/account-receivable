@@ -217,9 +217,9 @@ public class CollectionService {
      */
     @Transactional
     public InvoiceResponse amendPlan(String invoiceId, List<IssueInvoiceRequest.InstallmentRequest> legs,
-                                     String reason, String decidedBy, String correlationId) {
-        Invoice invoice = invoiceService.amendPlan(invoiceId, legs, reason);
-        contractEvents.planAmended(invoice, correlationId, reason, decidedBy);
+                                     String reason, String reference, String decidedBy, String correlationId) {
+        Invoice invoice = invoiceService.amendPlan(invoiceId, legs, reason, reference);
+        contractEvents.planAmended(invoice, correlationId, reason, reference, decidedBy);
         syncPlanCharge(invoice, "PLAN_AMENDED");
         return InvoiceResponse.from(invoice, today());
     }
@@ -230,8 +230,8 @@ public class CollectionService {
      * to zero cancels the invoice, and its charges through the cancellation outbox.
      */
     @Transactional
-    public InvoiceResponse amendAmount(String invoiceId, BigDecimal amount, String reason) {
-        Invoice invoice = invoiceService.amendAmount(invoiceId, amount, reason);
+    public InvoiceResponse amendAmount(String invoiceId, BigDecimal amount, String reason, String reference) {
+        Invoice invoice = invoiceService.amendAmount(invoiceId, amount, reason, reference);
         carryToGateway(invoice, "INVOICE_AMENDED");
         return InvoiceResponse.from(invoice, today());
     }
@@ -368,7 +368,7 @@ public class CollectionService {
      * — its VA retired by the sweep and a real payment refused at the bank.
      */
     @Transactional
-    public DueDateOutcome amendDueDate(String invoiceId, LocalDate newDueDate) {
+    public DueDateOutcome amendDueDate(String invoiceId, LocalDate newDueDate, String reference) {
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new NotFoundException("Invoice not found: " + invoiceId));
         if (invoice.isInstallment()) {
@@ -401,7 +401,8 @@ public class CollectionService {
         auditService.record("INVOICE_DUE_DATE_AMENDED", "Invoice", invoiceId,
                 "from=" + previous + " to=" + newDueDate + " outcome=" + outcome.kind()
                         + (outcome.blockingBillNumber() == null ? ""
-                           : " blockedBy=" + outcome.blockingBillNumber() + "/" + outcome.blockingStatus()));
+                           : " blockedBy=" + outcome.blockingBillNumber() + "/" + outcome.blockingStatus())
+                        + (reference != null ? " reference=" + reference : ""));
         return outcome;
     }
 
@@ -447,7 +448,7 @@ public class CollectionService {
      * after the VA lapsed is the ordinary case, not the exotic one.
      */
     @Transactional
-    public void amendInstallmentDueDate(String installmentId, LocalDate newDueDate) {
+    public void amendInstallmentDueDate(String installmentId, LocalDate newDueDate, String reference) {
         Installment installment = installmentRepository.findById(installmentId)
                 .orElseThrow(() -> new NotFoundException("Installment not found: " + installmentId));
         PaymentStatus status = installment.getPaymentStatus();
@@ -475,7 +476,7 @@ public class CollectionService {
         syncPlanCharge(invoice, "INSTALLMENT_DUE");
         auditService.record("INSTALLMENT_DUE_DATE_AMENDED", "Installment", installmentId,
                 "invoice=" + invoice.getId() + " sequence=" + installment.getSequence()
-                        + " from=" + previous + " to=" + newDueDate);
+                        + " from=" + previous + " to=" + newDueDate + (reference != null ? " reference=" + reference : ""));
     }
 
     private Charge openCharge(String targetReference, Invoice invoice, Installment installment,

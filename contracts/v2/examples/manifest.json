@@ -103,6 +103,12 @@
       "rejection": "SCHEMA_INVALID"
     },
     {
+      "file": "examples/commands/invoice.planAmended/invalid-empty-reference.json",
+      "schemaRef": "#/$defs/command.invoice.planAmended",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID"
+    },
+    {
       "file": "examples/commands/invoice.planAmended/rejected-sum-not-outstanding.json",
       "schemaRef": "#/$defs/command.invoice.planAmended",
       "schemaValid": true,

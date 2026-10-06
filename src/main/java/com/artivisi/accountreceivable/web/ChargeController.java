@@ -31,7 +31,7 @@ public class ChargeController {
             @PathVariable String id,
             @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
             com.artivisi.accountreceivable.dto.AmendPlanRequest request) {
-        return service.amendPlan(id, request.installments(), request.reason(), "api", null);
+        return service.amendPlan(id, request.installments(), request.reason(), null, "api", null);
     }
 
     /**
@@ -41,7 +41,7 @@ public class ChargeController {
     @PostMapping("/api/invoices/{id}/due-date")
     public ResponseEntity<Void> amendDueDate(@PathVariable String id,
                                              @Valid @RequestBody AmendDueDateRequest request) {
-        service.amendDueDate(id, request.dueDate());
+        service.amendDueDate(id, request.dueDate(), null);
         return ResponseEntity.noContent().build();
     }
 
@@ -52,7 +52,7 @@ public class ChargeController {
     @PostMapping("/api/installments/{id}/due-date")
     public ResponseEntity<Void> amendInstallmentDueDate(@PathVariable String id,
                                                         @Valid @RequestBody AmendDueDateRequest request) {
-        service.amendInstallmentDueDate(id, request.dueDate());
+        service.amendInstallmentDueDate(id, request.dueDate(), null);
         return ResponseEntity.noContent().build();
     }
 

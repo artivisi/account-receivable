@@ -7,6 +7,7 @@
     "idempotencyKey": "aplikasi-akademik:ukt-koreksi:2600000001:20262:r1",
     "invoiceNumber": "2026082740999001",
     "amount": "5000000.00",
-    "reason": "Koreksi nominal setelah penetapan beasiswa"
+    "reason": "Koreksi nominal setelah penetapan beasiswa",
+    "reference": "KRG-2026-0143"
   }
 }

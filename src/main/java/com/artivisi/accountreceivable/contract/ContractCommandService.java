@@ -136,17 +136,18 @@ public class ContractCommandService {
     private CommandResult invoiceAmended(JsonNode p) {
         Invoice invoice = load(p.get("invoiceNumber").asText());
         assertAmendable(invoice);
+        String reference = reference(p);
         if (p.hasNonNull("amount")) {
             collectionService.amendAmount(invoice.getId(), new BigDecimal(p.get("amount").asText()),
-                    p.get("reason").asText());
+                    p.get("reason").asText(), reference);
         }
         if (p.hasNonNull("dueDate")) {
             LocalDate dueDate = LocalDate.parse(p.get("dueDate").asText());
             if (invoice.isInstallment()) {
                 var last = invoice.getSchedule().ordered().getLast();
-                collectionService.amendInstallmentDueDate(last.getId(), dueDate);
+                collectionService.amendInstallmentDueDate(last.getId(), dueDate, reference);
             } else {
-                collectionService.amendDueDate(invoice.getId(), dueDate);
+                collectionService.amendDueDate(invoice.getId(), dueDate, reference);
             }
         }
         Invoice after = invoiceRepository.findById(invoice.getId()).orElseThrow();
@@ -157,7 +158,7 @@ public class ContractCommandService {
         Invoice invoice = load(p.get("invoiceNumber").asText());
         assertAmendable(invoice);
         List<IssueInvoiceRequest.InstallmentRequest> legs = plan(p.get("paymentPlan"));
-        collectionService.amendPlan(invoice.getId(), legs, p.get("reason").asText(), producer,
+        collectionService.amendPlan(invoice.getId(), legs, p.get("reason").asText(), reference(p), producer,
                 p.get("idempotencyKey").asText());
         // planAmended's own event is emitted by the service, on every path.
         return new CommandResult(invoice.getDebtor().getCode(), null);
@@ -178,7 +179,7 @@ public class ContractCommandService {
         }
         String note = p.hasNonNull("note") ? p.get("note").asText() : null;
         return new CommandResult(invoice.getDebtor().getCode(),
-                invoiceService.cancel(invoice.getId(), reason, replacedBy, note, producer));
+                invoiceService.cancel(invoice.getId(), reason, replacedBy, note, reference(p), producer));
     }
 
     /**
@@ -286,6 +287,15 @@ public class ContractCommandService {
     private Invoice load(String invoiceNumber) {
         return resolve(invoiceNumber)
                 .orElseThrow(() -> new ContractRejectedException("INVOICE_NOT_FOUND", "invoice " + invoiceNumber + " is not known"));
+    }
+
+    /**
+     * The upstream approval a person-decided change rests on, for tracing it back to its approval
+     * chain. Optional until every producer sends it; absent means the producer did not send one,
+     * and is recorded as such rather than filled in.
+     */
+    private static String reference(JsonNode p) {
+        return p.hasNonNull("reference") ? p.get("reference").asText() : null;
     }
 
     private static void assertAmendable(Invoice invoice) {

@@ -279,6 +279,9 @@
         },
         "reason": {
           "$ref": "#/$defs/reasonText"
+        },
+        "reference": {
+          "$ref": "#/$defs/decisionReference"
         }
       },
       "anyOf": [
@@ -316,6 +319,9 @@
         },
         "reason": {
           "$ref": "#/$defs/reasonText"
+        },
+        "reference": {
+          "$ref": "#/$defs/decisionReference"
         }
       }
     },
@@ -342,6 +348,9 @@
             "ISSUED_IN_ERROR",
             "WITHDRAWN"
           ]
+        },
+        "reference": {
+          "$ref": "#/$defs/decisionReference"
         },
         "replacedBy": {
           "$ref": "#/$defs/invoiceNumber"
@@ -583,6 +592,9 @@
         "reason": {
           "type": "string"
         },
+        "reference": {
+          "$ref": "#/$defs/decisionReference"
+        },
         "decidedBy": {
           "type": "string",
           "minLength": 1
@@ -797,6 +809,9 @@
             "WITHDRAWN",
             "AMENDED_TO_ZERO"
           ]
+        },
+        "reference": {
+          "$ref": "#/$defs/decisionReference"
         },
         "replacedBy": {
           "$ref": "#/$defs/invoiceNumber"
@@ -1241,6 +1256,12 @@
           }
         }
       ]
+    },
+    "decisionReference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Nomor persetujuan di aplikasi pengirim yang mendasari perubahan ini, misalnya nomor permohonan keringanan yang sudah disetujui atau nomor SK. Dicatat di audit AR dan dikembalikan pada event jawaban, supaya perubahan dapat ditelusuri ke rantai persetujuannya. Opsional sejak revisi 4; direncanakan wajib pada revisi 5."
     }
   }
 }

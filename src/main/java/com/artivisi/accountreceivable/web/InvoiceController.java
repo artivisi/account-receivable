@@ -78,7 +78,7 @@ public class InvoiceController {
     public InvoiceResponse cancel(@PathVariable String id,
                                   @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
                                   com.artivisi.accountreceivable.dto.CancelInvoiceRequest request) {
-        service.cancel(id, request.reason(), request.replacedBy(), request.note(), "api");
+        service.cancel(id, request.reason(), request.replacedBy(), request.note(), null, "api");
         return service.get(id);
     }
 

@@ -61,6 +61,7 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
     @Autowired com.artivisi.accountreceivable.service.ChargeCancellationDispatcher cancellationDispatcher;
     @Autowired InvoiceRepository invoiceRepository;
     @Autowired InvoiceTypeRepository invoiceTypeRepository;
+    @Autowired com.artivisi.accountreceivable.repository.AuditEventRepository auditEvents;
     private ApiClient api;
 
     @BeforeEach
@@ -375,6 +376,9 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(amended.get("paymentPlan")).hasSize(4);
         assertThat(amended.get("correlationId").asText()).isEqualTo(keyOf(message));
         assertThat(amended.get("decidedBy").asText()).isEqualTo("aplikasi-akademik");
+        // The upstream approval travels with the decision: echoed to the sender and kept in audit.
+        assertThat(amended.get("reference").asText()).isEqualTo("KRG-2026-0142");
+        assertThat(auditDetail("INVOICE_PLAN_AMENDED", invoiceNumber)).contains("reference=KRG-2026-0142");
         assertThat(payloadOf(events.get(1)).get("reason").asText()).isEqualTo("PLAN_AMENDED");
         assertThat(payloadOf(events.get(1)).get("amount").asText()).isEqualTo("1625000.00");
         assertThat(gatewayRepriceCount()).isEqualTo(repricesBefore + 1);
@@ -394,6 +398,8 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(cancelled.get("reason").asText()).isEqualTo("DUPLICATE");
         assertThat(cancelled.get("outstandingAtDecision").asText()).isEqualTo("6500000.00");
         assertThat(cancelled.get("decidedBy").asText()).isEqualTo("aplikasi-akademik");
+        // Optional until revision 5: a command without one is recorded without one, not filled in.
+        assertThat(cancelled.has("reference")).isFalse();
         assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getPaymentStatus())
                 .isEqualTo(PaymentStatus.CANCELLED);
         // The VA is retired at the gateway through the cancellation outbox; drain it here so the
@@ -428,6 +434,32 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(payloadOf(events.get(0)).get("reason").asText()).isEqualTo("INVOICE_AMENDED");
         assertThat(payloadOf(events.get(1)).get("amount").asText()).isEqualTo("5000000.00");
         assertThat(gatewayRepriceCount()).isEqualTo(repricesBefore + 1);
+        assertThat(auditDetail("INVOICE_AMOUNT_AMENDED", invoiceNumber)).contains("reference=KRG-2026-0143");
+    }
+
+    @Test
+    void cancelledWithReference_echoesIt() throws IOException {
+        String invoiceNumber = issuePlan();
+        String replacement = issueSingle();
+        ObjectNode root = (ObjectNode) JSON.readTree(
+                fixture("commands/invoice.cancelled/valid-superseded.json", invoiceNumber));
+        ((ObjectNode) root.get("payload")).put("replacedBy", replacement);
+        int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", JSON.writeValueAsString(root));
+
+        JsonNode cancelled = payloadOf(eventsFor(DEBTOR, before).get(0));
+        assertThat(cancelled.get("reference").asText()).isEqualTo("KNV-2026-0007");
+        assertThat(validate(eventsFor(DEBTOR, before).get(0))).isEmpty();
+        assertThat(auditDetail("INVOICE_CANCELLED", invoiceNumber)).contains("reference=KNV-2026-0007");
+        cancellationDispatcher.dispatchDue();
+    }
+
+    private String auditDetail(String eventType, String invoiceNumber) {
+        String invoiceId = invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getId();
+        return auditEvents.findAll().stream()
+                .filter(e -> eventType.equals(e.getEventType()) && invoiceId.equals(e.getEntityId()))
+                .reduce((a, b) -> b).orElseThrow().getDetail();
     }
 
     @Test
