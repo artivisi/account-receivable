@@ -28,6 +28,7 @@ import com.artivisi.accountreceivable.entity.ChargeType;
 import com.artivisi.accountreceivable.entity.Debtor;
 import com.artivisi.accountreceivable.entity.Installment;
 import com.artivisi.accountreceivable.entity.Invoice;
+import com.artivisi.accountreceivable.entity.PaymentSource;
 import com.artivisi.accountreceivable.entity.NotificationSourceType;
 import com.artivisi.accountreceivable.entity.PaymentStatus;
 import com.artivisi.accountreceivable.exception.InvalidRequestException;
@@ -338,11 +339,11 @@ public class CollectionService {
 
     /** Idempotent lookup for a payment already applied — used to resolve concurrent webhook redelivery. */
     @Transactional(readOnly = true)
-    public CashApplicationResponse getAppliedByReference(String gatewayPaymentReference) {
-        return cashApplicationRepository.findByGatewayPaymentReference(gatewayPaymentReference)
+    public CashApplicationResponse getAppliedByReference(String paymentReference) {
+        return cashApplicationRepository.findBySourceAndPaymentReference(PaymentSource.GATEWAY, paymentReference)
                 .map(CashApplicationResponse::from)
                 .orElseThrow(() -> new NotFoundException(
-                        "No cash application for reference " + gatewayPaymentReference));
+                        "No cash application for reference " + paymentReference));
     }
 
     /**
@@ -707,13 +708,14 @@ public class CollectionService {
         }
 
         CashApplication existing =
-                cashApplicationRepository.findByGatewayPaymentReference(payload.bankReference()).orElse(null);
+                cashApplicationRepository.findBySourceAndPaymentReference(PaymentSource.GATEWAY, payload.bankReference()).orElse(null);
         if (existing != null) {
             return CashApplicationResponse.from(existing);
         }
 
         CashApplication application = new CashApplication();
-        application.setGatewayPaymentReference(payload.bankReference());
+        application.setSource(PaymentSource.GATEWAY);
+        application.setPaymentReference(payload.bankReference());
         application.setAmount(payload.paymentAmount());
         application.setReceivedAt(Instant.now(clock));
 
@@ -799,7 +801,7 @@ public class CollectionService {
         data.put("currency", charge.getCurrency());
         data.put("cumulativePaid", charge.getCumulativePaid().toPlainString());
         data.put("outstanding", outstanding.toPlainString());
-        data.put("paymentReference", application.getGatewayPaymentReference());
+        data.put("paymentReference", application.getPaymentReference());
         data.put("paidAt", application.getReceivedAt().toString());
         data.put("paidAtLocal", PAID_AT_LOCAL.format(application.getReceivedAt().atZone(clock.getZone())));
         data.put("invoiceType", receivable.getInvoiceType().getName());
@@ -808,7 +810,7 @@ public class CollectionService {
         put(data, "email", debtor.getEmail());
         put(data, "phone", debtor.getPhone());
         notificationService.enqueue(notificationProperties.paymentConfig(), debtor.getEmail(), debtor.getPhone(),
-                NotificationSourceType.PAYMENT_RECEIVED, application.getGatewayPaymentReference(),
+                NotificationSourceType.PAYMENT_RECEIVED, application.getPaymentReference(),
                 payloadMapper.paymentReceived(data));
     }
 
@@ -822,7 +824,7 @@ public class CollectionService {
             throw new InvalidRequestException("Reversal webhook missing bankReference");
         }
         CashApplication application =
-                cashApplicationRepository.findByGatewayPaymentReference(payload.bankReference()).orElse(null);
+                cashApplicationRepository.findBySourceAndPaymentReference(PaymentSource.GATEWAY, payload.bankReference()).orElse(null);
         if (application == null) {
             log.warn("PAYMENT_REVERSED for unknown payment reference {}", payload.bankReference());
             return new CashApplicationResponse(payload.bankReference(), null, BigDecimal.ZERO,
@@ -841,6 +843,8 @@ public class CollectionService {
         }
         application.setStatus(CashApplicationStatus.REVERSED);
         application.setNote("reversed by gateway");
+        application.setReversedAt(Instant.now(clock));
+        application.setReversalReason("BANK_REVERSED");
 
         Charge charge = application.getCharge();
         charge.setCumulativePaid(charge.getCumulativePaid().subtract(application.getAmount()));
@@ -849,7 +853,11 @@ public class CollectionService {
                 : charge.getInstallment().getSchedule().getInvoice();
         auditService.record("PAYMENT_REVERSED", "Invoice", receivable.getId(),
                 "amount=" + application.getAmount() + " ref=" + payload.bankReference());
-        return CashApplicationResponse.from(cashApplicationRepository.save(application));
+        CashApplication saved = cashApplicationRepository.save(application);
+        // Tell the upstream application. It raised its applicant's status on payment.received and has
+        // no way of learning that the money went back.
+        contractEvents.paymentReversed(saved, receivable, charge.getVaNumber(), charge.getEscrowCode());
+        return CashApplicationResponse.from(saved);
     }
 
     private CashApplicationResponse park(CashApplication application, Charge charge, String currency,
@@ -858,7 +866,7 @@ public class CollectionService {
         application.setCurrency(currency);
         application.setStatus(CashApplicationStatus.UNAPPLIED);
         application.setNote(note);
-        log.warn("Parking unapplied payment {}: {}", application.getGatewayPaymentReference(), note);
+        log.warn("Parking unapplied payment {}: {}", application.getPaymentReference(), note);
         return CashApplicationResponse.from(cashApplicationRepository.save(application));
     }
 

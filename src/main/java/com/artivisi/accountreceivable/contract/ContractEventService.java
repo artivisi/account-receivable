@@ -218,11 +218,41 @@ public class ContractEventService {
         p.put("cumulativePaid", money(invoice.getAmount().subtract(invoice.getOutstanding())));
         p.put("outstanding", money(invoice.getOutstanding()));
         p.put("bank", bank);
-        p.put("reference", application.getGatewayPaymentReference());
+        p.put("reference", application.getPaymentReference());
         p.put("paidAt", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
                 OffsetDateTime.ofInstant(application.getReceivedAt(), clock.getZone())));
         p.put("invoiceStatus", invoice.getPaymentStatus().name());
         return enqueue(properties.topics().paymentEvent(), invoice.getDebtor().getCode(), "payment.received", p);
+    }
+
+    /**
+     * A payment that has been taken back out of the books: reversed by the bank, or reversed by
+     * finance because it was booked against the wrong receivable.
+     *
+     * <p>Emitted on every reversal path, because the consumer cannot derive this one. A payment it
+     * was told about moved its applicant forward — paid, documents unlocked, status raised — and
+     * nothing in its own data ever contradicts that. Without this event the applicant reads as
+     * settled for good, and only comparing the two databases would show it. The figures are the
+     * receivable's state *after* the reversal, so the consumer can overwrite rather than subtract.
+     */
+    public String paymentReversed(CashApplication application, Invoice invoice, String vaNumber, String bank) {
+        ObjectNode p = JSON.createObjectNode();
+        putInvoiceNumbers(p, invoice);
+        p.put("debtorCode", invoice.getDebtor().getCode());
+        putNullable(p, "vaNumber", vaNumber);
+        p.put("currency", invoice.getCurrency());
+        p.put("amount", money(application.getAmount()));
+        p.put("cumulativePaid", money(invoice.getAmount().subtract(invoice.getOutstanding())));
+        p.put("outstanding", money(invoice.getOutstanding()));
+        putNullable(p, "bank", bank);
+        p.put("source", application.getSource().name());
+        p.put("reference", application.getPaymentReference());
+        p.put("reversedAt", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+                OffsetDateTime.ofInstant(application.getReversedAt(), clock.getZone())));
+        putNullable(p, "reason", application.getReversalReason());
+        putNullable(p, "decisionReference", application.getReversalReference());
+        p.put("invoiceStatus", invoice.getPaymentStatus().name());
+        return enqueue(properties.topics().paymentEvent(), invoice.getDebtor().getCode(), "payment.reversed", p);
     }
 
     // ------------------------------------------------------------------ plumbing

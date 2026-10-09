@@ -4,6 +4,7 @@ import com.artivisi.accountreceivable.contract.ContractEventService;
 import com.artivisi.accountreceivable.dto.AnomalyQueueItem;
 import com.artivisi.accountreceivable.dto.CashApplicationResponse;
 import com.artivisi.accountreceivable.entity.CashApplication;
+import com.artivisi.accountreceivable.entity.PaymentSource;
 import com.artivisi.accountreceivable.entity.CashApplicationLine;
 import com.artivisi.accountreceivable.entity.CashApplicationStatus;
 import com.artivisi.accountreceivable.entity.Charge;
@@ -156,7 +157,10 @@ public class ReceivableAnomalyService {
         Invoice invoice = finding.getInvoice();
         BigDecimal amount = finding.getEvidenceAmount();
         CashApplication application = new CashApplication();
-        application.setGatewayPaymentReference(finding.getEvidenceRef());
+        // The bank's own reference, so it lives in the gateway's namespace even though the gateway
+        // never delivered this one — that is the whole point of the finding.
+        application.setSource(PaymentSource.GATEWAY);
+        application.setPaymentReference(finding.getEvidenceRef());
         application.setCharge(finding.getCharge());
         application.setAmount(amount);
         application.setCurrency(invoice.getCurrency());
@@ -227,7 +231,7 @@ public class ReceivableAnomalyService {
             return Optional.of("The finding's VA number " + finding.getEvidenceVaNumber() + " is not all digits");
         }
         Optional<CashApplication> existing =
-                cashApplicationRepository.findByGatewayPaymentReference(finding.getEvidenceRef());
+                cashApplicationRepository.findBySourceAndPaymentReference(PaymentSource.GATEWAY, finding.getEvidenceRef());
         if (existing.isPresent()) {
             return Optional.of("Bank reference " + finding.getEvidenceRef() + " is already booked"
                     + heldBy(existing.get()) + "; resolve this finding as ALREADY_RECORDED instead");

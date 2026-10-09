@@ -17,7 +17,7 @@ import java.util.List;
  * invoice; null (rendered as a dash) for UNAPPLIED/parked payments with no allocation.
  */
 public record CashApplicationListItem(
-        String gatewayPaymentReference,
+        String paymentReference,
         CashApplicationStatus status,
         BigDecimal amount,
         Instant receivedAt,
@@ -32,7 +32,7 @@ public record CashApplicationListItem(
         List<Allocation> allocations = c.getLines() == null ? List.of()
                 : c.getLines().stream().map(CashApplicationListItem::allocation).toList();
         return new CashApplicationListItem(
-                c.getGatewayPaymentReference(), c.getStatus(), c.getAmount(), c.getReceivedAt(),
+                c.getPaymentReference(), c.getStatus(), c.getAmount(), c.getReceivedAt(),
                 c.getCharge() != null ? c.getCharge().getVaNumber() : null,
                 allocations.isEmpty() ? null : debtorName(c.getLines().get(0)),
                 allocations);

@@ -125,7 +125,7 @@ public class DebtorLedgerService {
         for (DebtorCollectionLine line : debtorLines) {
             LocalDate receivedDate = line.receivedAt().atZone(ZoneId.systemDefault()).toLocalDate();
 
-            rawEntries.add(new RawEntry(receivedDate, line.gatewayPaymentReference(),
+            rawEntries.add(new RawEntry(receivedDate, line.paymentReference(),
                     "Pembayaran" + (line.installmentSequence() != null
                             ? " cicilan " + line.installmentSequence() : ""),
                     null, line.allocatedAmount()));

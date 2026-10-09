@@ -2,6 +2,7 @@ package com.artivisi.accountreceivable.repository;
 
 import com.artivisi.accountreceivable.dto.DebtorCollectionLine;
 import com.artivisi.accountreceivable.entity.CashApplication;
+import com.artivisi.accountreceivable.entity.PaymentSource;
 import com.artivisi.accountreceivable.entity.CashApplicationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,7 +16,17 @@ import java.util.Optional;
 
 public interface CashApplicationRepository extends JpaRepository<CashApplication, String> {
 
-    Optional<CashApplication> findByGatewayPaymentReference(String gatewayPaymentReference);
+    /**
+     * A reference is unique only within its source, so every caller that knows which namespace it is
+     * asking about must say so. Asking without a source can match two different payments.
+     */
+    Optional<CashApplication> findBySourceAndPaymentReference(PaymentSource source, String paymentReference);
+
+    /**
+     * Every payment carrying this reference, across namespaces. For callers that genuinely do not
+     * know the source; more than one result is an ambiguity to refuse, never to resolve by picking.
+     */
+    List<CashApplication> findAllByPaymentReference(String paymentReference);
 
     Page<CashApplication> findByStatus(CashApplicationStatus status, Pageable p);
 
@@ -43,7 +54,7 @@ public interface CashApplicationRepository extends JpaRepository<CashApplication
     @Query("""
             select new com.artivisi.accountreceivable.dto.DebtorCollectionLine(
                        ca.receivedAt,
-                       ca.gatewayPaymentReference,
+                       ca.paymentReference,
                        line.allocatedAmount,
                        cast(null as Integer),
                        inv.dueDate)
@@ -62,7 +73,7 @@ public interface CashApplicationRepository extends JpaRepository<CashApplication
     @Query("""
             select new com.artivisi.accountreceivable.dto.DebtorCollectionLine(
                        ca.receivedAt,
-                       ca.gatewayPaymentReference,
+                       ca.paymentReference,
                        line.allocatedAmount,
                        inst.sequence,
                        inst.dueDate)

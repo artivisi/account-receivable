@@ -42,15 +42,15 @@
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="a : ${cashApplications}" th:id="'cash-application-row-' + ${a.gatewayPaymentReference}">
-                    <td class="td font-mono" th:text="${a.gatewayPaymentReference}"></td>
+                <tr th:each="a : ${cashApplications}" th:id="'cash-application-row-' + ${a.paymentReference}">
+                    <td class="td font-mono" th:text="${a.paymentReference}"></td>
                     <td class="td font-mono" th:text="${#temporals.format(a.receivedAt, 'dd MMM yyyy HH:mm')}"></td>
                     <td class="td" th:text="${a.debtorName} ?: '—'"></td>
                     <td class="td text-right font-mono" th:text="${@money.amount(a.amount)}"></td>
                     <td class="td">
                         <th:block th:each="al, st : ${a.allocations}"><a
                             class="font-mono text-primary-700 hover:underline"
-                            th:id="'cash-application-allocation-' + ${a.gatewayPaymentReference} + '-' + ${st.index}"
+                            th:id="'cash-application-allocation-' + ${a.paymentReference} + '-' + ${st.index}"
                             th:href="@{/admin/invoices/{id}(id=${al.invoiceId})}"
                             th:text="${al.label}"></a><span th:if="${!st.last}">, </span></th:block>
                         <span th:if="${a.allocations.isEmpty()}" class="text-slate-400">— tanpa alokasi —</span>

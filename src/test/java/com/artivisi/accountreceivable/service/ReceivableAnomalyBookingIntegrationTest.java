@@ -3,6 +3,7 @@ package com.artivisi.accountreceivable.service;
 import com.artivisi.accountreceivable.AbstractIntegrationTest;
 import com.artivisi.accountreceivable.dto.AnomalyQueueItem;
 import com.artivisi.accountreceivable.entity.CashApplication;
+import com.artivisi.accountreceivable.entity.PaymentSource;
 import com.artivisi.accountreceivable.entity.CashApplicationStatus;
 import com.artivisi.accountreceivable.entity.ContractEventOutbox;
 import com.artivisi.accountreceivable.entity.Invoice;
@@ -117,7 +118,7 @@ class ReceivableAnomalyBookingIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void assertNothingBooked(String ref, String anomalyId, String invoiceId, String outstanding) {
-        assertThat(cashApplications.findByGatewayPaymentReference(ref)).isEmpty();
+        assertThat(cashApplications.findBySourceAndPaymentReference(PaymentSource.GATEWAY, ref)).isEmpty();
         assertThat(anomalies.findById(anomalyId).orElseThrow().open()).isTrue();
         assertThat(invoices.findById(invoiceId).orElseThrow().getOutstanding())
                 .isEqualByComparingTo(outstanding);
@@ -133,7 +134,7 @@ class ReceivableAnomalyBookingIntegrationTest extends AbstractIntegrationTest {
 
         service.bookPayment(a.getId(), "Dicocokkan dengan laporan portal bank", "finance-1");
 
-        CashApplication booked = cashApplications.findByGatewayPaymentReference(ref).orElseThrow();
+        CashApplication booked = cashApplications.findBySourceAndPaymentReference(PaymentSource.GATEWAY, ref).orElseThrow();
         assertThat(booked.getStatus()).isEqualTo(CashApplicationStatus.APPLIED);
         assertThat(booked.getAmount()).isEqualByComparingTo("500000");
         assertThat(booked.getReceivedAt()).isEqualTo(BANK_TIME);
@@ -187,7 +188,7 @@ class ReceivableAnomalyBookingIntegrationTest extends AbstractIntegrationTest {
 
         service.bookPayment(a.getId(), "Dicocokkan", "finance-1");
 
-        CashApplication booked = cashApplications.findByGatewayPaymentReference(ref).orElseThrow();
+        CashApplication booked = cashApplications.findBySourceAndPaymentReference(PaymentSource.GATEWAY, ref).orElseThrow();
         List<Map<String, Object>> legs = jdbc.queryForList("""
                 select i.sequence, i.outstanding, i.payment_status, l.allocated_amount
                   from installment i
@@ -278,7 +279,7 @@ class ReceivableAnomalyBookingIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> service.bookPayment(a.getId(), "Dicocokkan", "finance-1"))
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("WRITTEN_OFF");
-        assertThat(cashApplications.findByGatewayPaymentReference(ref)).isEmpty();
+        assertThat(cashApplications.findBySourceAndPaymentReference(PaymentSource.GATEWAY, ref)).isEmpty();
         assertThat(anomalies.findById(a.getId()).orElseThrow().open()).isTrue();
     }
 
@@ -312,7 +313,7 @@ class ReceivableAnomalyBookingIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> service.bookPayment(a.getId(), "Dicocokkan", "finance-1"))
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("already decided");
-        assertThat(cashApplications.findByGatewayPaymentReference(ref)).isEmpty();
+        assertThat(cashApplications.findBySourceAndPaymentReference(PaymentSource.GATEWAY, ref)).isEmpty();
     }
 
     @Test

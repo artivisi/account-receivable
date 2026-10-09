@@ -45,7 +45,7 @@ class UpstreamAckIntegrationTest extends AbstractIntegrationTest {
 
         CashApplication row = reviewService.upstreamMissing(PageRequest.of(0, 50))
                 .getContent().stream()
-                .filter(c -> reference.equals(c.getGatewayPaymentReference()))
+                .filter(c -> reference.equals(c.getPaymentReference()))
                 .findFirst().orElseThrow();
         assertThat(row.getUpstreamMissingAt()).isNotNull();
         assertThat(row.getUpstreamMissingNote()).contains("tidak memiliki va");
@@ -64,13 +64,13 @@ class UpstreamAckIntegrationTest extends AbstractIntegrationTest {
         String reference = pay("ua-b", 400_000);
         reviewService.flagUpstreamMissing(reference, "hari pertama");
         var first = reviewService.upstreamMissing(PageRequest.of(0, 50)).getContent().stream()
-                .filter(c -> reference.equals(c.getGatewayPaymentReference())).findFirst().orElseThrow();
+                .filter(c -> reference.equals(c.getPaymentReference())).findFirst().orElseThrow();
         var firstSeen = first.getUpstreamMissingAt();
 
         reviewService.flagUpstreamMissing(reference, "hari kedua, masih hilang");
 
         var again = reviewService.upstreamMissing(PageRequest.of(0, 50)).getContent().stream()
-                .filter(c -> reference.equals(c.getGatewayPaymentReference())).toList();
+                .filter(c -> reference.equals(c.getPaymentReference())).toList();
         assertThat(again).hasSize(1);
         assertThat(again.get(0).getUpstreamMissingAt()).isEqualTo(firstSeen);
         assertThat(again.get(0).getUpstreamMissingNote()).isEqualTo("hari pertama");
@@ -81,7 +81,7 @@ class UpstreamAckIntegrationTest extends AbstractIntegrationTest {
         String reference = pay("ua-c", 250_000);
         reviewService.flagUpstreamMissing(reference, "belum tercatat");
         String id = reviewService.upstreamMissing(PageRequest.of(0, 50)).getContent().stream()
-                .filter(c -> reference.equals(c.getGatewayPaymentReference()))
+                .filter(c -> reference.equals(c.getPaymentReference()))
                 .findFirst().orElseThrow().getId();
 
         assertThatThrownBy(() -> reviewService.clearUpstreamMissing(id, " "))
@@ -90,7 +90,7 @@ class UpstreamAckIntegrationTest extends AbstractIntegrationTest {
         reviewService.clearUpstreamMissing(id, "Sudah diinput manual oleh Keuangan");
 
         assertThat(reviewService.upstreamMissing(PageRequest.of(0, 50)).getContent())
-                .extracting(CashApplication::getGatewayPaymentReference)
+                .extracting(CashApplication::getPaymentReference)
                 .doesNotContain(reference);
         // Kept, not deleted: a debtor whose payments keep going missing is its own problem, and
         // that pattern is only visible if cleared rows survive.

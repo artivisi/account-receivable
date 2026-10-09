@@ -289,14 +289,22 @@ public class ReceivableReviewService {
      * first seen, which is what tells a reviewer how long it has been outstanding.
      */
     @Transactional
-    public void flagUpstreamMissing(String gatewayPaymentReference, String note) {
+    public void flagUpstreamMissing(String paymentReference, String note) {
         if (note == null || note.isBlank()) {
             throw new InvalidRequestException("A note describing what the check found is required");
         }
-        CashApplication ca = cashApplicationRepository
-                .findByGatewayPaymentReference(gatewayPaymentReference)
-                .orElseThrow(() -> new NotFoundException(
-                        "No cash application for reference " + gatewayPaymentReference));
+        // Cross-namespace on purpose: an external check reports a reference, not the source that
+        // issued it. Two payments can carry the same reference from different sources, and choosing
+        // one would flag the wrong payment as unbooked upstream.
+        List<CashApplication> matches = cashApplicationRepository.findAllByPaymentReference(paymentReference);
+        if (matches.isEmpty()) {
+            throw new NotFoundException("No cash application for reference " + paymentReference);
+        }
+        if (matches.size() > 1) {
+            throw new InvalidRequestException("Reference " + paymentReference + " belongs to "
+                    + matches.size() + " payments from different sources; name the source to flag one");
+        }
+        CashApplication ca = matches.getFirst();
         if (ca.getUpstreamMissingAt() != null && ca.getUpstreamClearedAt() == null) {
             return; // already open — keep the original moment
         }
@@ -306,7 +314,7 @@ public class ReceivableReviewService {
         ca.setUpstreamClearedNote(null);
         cashApplicationRepository.save(ca);
         auditService.record("PAYMENT_MISSING_UPSTREAM", "CashApplication", ca.getId(),
-                "reference=" + gatewayPaymentReference + " amount=" + ca.getAmount()
+                "reference=" + paymentReference + " amount=" + ca.getAmount()
                         + " note=" + note.strip());
     }
 
@@ -329,7 +337,7 @@ public class ReceivableReviewService {
         ca.setUpstreamClearedNote(note.strip());
         cashApplicationRepository.save(ca);
         auditService.record("PAYMENT_MISSING_UPSTREAM_CLEARED", "CashApplication", ca.getId(),
-                "reference=" + ca.getGatewayPaymentReference() + " note=" + note.strip());
+                "reference=" + ca.getPaymentReference() + " note=" + note.strip());
     }
 
     @Transactional(readOnly = true)

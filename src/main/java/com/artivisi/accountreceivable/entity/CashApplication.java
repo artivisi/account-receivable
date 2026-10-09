@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A received payment. Idempotent on {@code gatewayPaymentReference} (unique) — a replayed webhook
+ * A received payment. Idempotent on {@code paymentReference} (unique) — a replayed webhook
  * resolves to the same row. Allocation lines are added only when the payment is applied.
  */
 @Getter
@@ -28,7 +28,14 @@ import java.util.List;
 @Table(name = "cash_application")
 public class CashApplication extends BaseEntity {
 
-    private String gatewayPaymentReference;
+    private String paymentReference;
+
+    /**
+     * Which namespace {@link #paymentReference} belongs to. Part of the row's identity: the unique
+     * constraint is (source, payment_reference), never the reference alone.
+     */
+    @Enumerated(EnumType.STRING)
+    private PaymentSource source;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_charge")
@@ -44,6 +51,21 @@ public class CashApplication extends BaseEntity {
     private CashApplicationStatus status;
 
     private String note;
+
+    /** When this payment was reversed, and on what grounds. Null until it is. */
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
+
+    @Column(name = "reversal_reason")
+    private String reversalReason;
+
+    /**
+     * The approval the reversal rests on, when a person decided it upstream. Same meaning as
+     * {@code reference} on the v2 commands: it points at a record in the deciding application, so a
+     * reversal in these books can be traced back to who allowed it.
+     */
+    @Column(name = "reversal_reference")
+    private String reversalReference;
 
     /**
      * When an external check found that the originating billing system had not booked this payment,

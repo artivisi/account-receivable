@@ -15,7 +15,7 @@ import java.time.LocalDate;
  */
 public record DebtorCollectionLine(
         Instant receivedAt,
-        String gatewayPaymentReference,
+        String paymentReference,
         BigDecimal allocatedAmount,
         Integer installmentSequence,
         LocalDate owningDueDate

@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.stream.Collectors;
 
 public record CashApplicationResponse(
-        String gatewayPaymentReference,
+        String paymentReference,
         CashApplicationStatus status,
         BigDecimal amount,
         String note,
@@ -20,7 +20,7 @@ public record CashApplicationResponse(
 ) {
     public static CashApplicationResponse from(CashApplication c) {
         return new CashApplicationResponse(
-                c.getGatewayPaymentReference(), c.getStatus(), c.getAmount(), c.getNote(),
+                c.getPaymentReference(), c.getStatus(), c.getAmount(), c.getNote(),
                 c.getReceivedAt(),
                 c.getCharge() != null ? c.getCharge().getVaNumber() : null,
                 allocationDescription(c));

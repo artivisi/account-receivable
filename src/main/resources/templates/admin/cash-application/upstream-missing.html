@@ -40,7 +40,7 @@
             <tbody class="divide-y divide-slate-100">
             <tr th:each="row : ${rows}" th:id="'upstream-row-' + ${row.id}" class="align-top">
                 <td class="td font-mono text-xs" th:text="${#temporals.format(row.receivedAt, 'dd MMM yyyy HH:mm')}"></td>
-                <td class="td font-mono text-xs" th:text="${row.gatewayPaymentReference}"></td>
+                <td class="td font-mono text-xs" th:text="${row.paymentReference}"></td>
                 <td class="td text-right font-mono" th:text="${@money.rupiah(row.amount)}"></td>
                 <td class="td">
                     <div class="text-xs text-slate-600" th:text="${row.upstreamMissingNote}"></div>
