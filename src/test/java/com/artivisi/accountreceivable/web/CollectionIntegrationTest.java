@@ -69,7 +69,8 @@ class CollectionIntegrationTest extends AbstractIntegrationTest {
                 .when().post("/api/invoices").then().statusCode(201).extract().path("id");
 
         given().when().post("/api/invoices/{id}/charge", invoiceId).then().statusCode(201);
-        // The legacy bill number must reach the gateway as billNumber (→ BSI nomorInvoice).
+        // The legacy bill number must reach the gateway as billNumber, which the adapter maps on
+        // to whatever its bank calls the invoice number.
         org.assertj.core.api.Assertions.assertThat(lastChargeBillNumber).isEqualTo("2026010101000031");
     }
 

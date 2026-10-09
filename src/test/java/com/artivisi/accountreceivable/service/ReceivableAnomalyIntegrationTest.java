@@ -111,7 +111,7 @@ class ReceivableAnomalyIntegrationTest extends AbstractIntegrationTest {
         a.setResolvedAt(Instant.now());
         a.setResolvedBy("finance");
         a.setResolution("CONFIRMED_WITH_BANK");
-        a.setResolutionNote("BSI confirmed the credit landed in the next batch");
+        a.setResolutionNote("The bank confirmed the credit landed in the next batch");
         anomalies.saveAndFlush(a);
 
         assertThat(anomalies.findByResolvedAtIsNullOrderByCreatedAtDesc())

@@ -700,8 +700,8 @@ public class CollectionService {
      * closes that — the charge is cancelled when nothing is left owing and repriced when something
      * is — and it is the same path a credit note and an amendment already take, so the three cannot
      * drift apart. The second is that the reference belongs to the sending application, not to a
-     * bank, which is why it is unique per {@link PaymentSource} and not globally: an SPMB receipt
-     * number that happens to equal a bank journal number must not be mistaken for a replay.
+     * bank, which is why it is unique per {@link PaymentSource} and not globally: an upstream
+     * receipt number that happens to equal a bank journal number must not be mistaken for a replay.
      *
      * <p>Nothing here parks money. The gateway path parks an over-payment because a bank cannot be
      * told to send less; a recorded payment is a person typing a figure, and a figure larger than

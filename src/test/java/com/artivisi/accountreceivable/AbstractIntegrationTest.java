@@ -146,7 +146,7 @@ public abstract class AbstractIntegrationTest {
             java.util.regex.Matcher em = EXPIRES_PATTERN.matcher(body);
             lastChargeExpiresAt = em.find() ? em.group(1) : null;
             if (vaNumber != null && !STUB_ACTIVE_VA.add(vaNumber)) {
-                respond(exchange, 409, "{\"detail\":\"vaNumber already active for escrow bsi: "
+                respond(exchange, 409, "{\"detail\":\"vaNumber already active for escrow demo: "
                         + vaNumber + "\",\"status\":409,\"title\":\"Conflict\"}");
                 return;
             }

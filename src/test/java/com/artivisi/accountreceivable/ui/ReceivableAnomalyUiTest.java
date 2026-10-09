@@ -52,7 +52,7 @@ class ReceivableAnomalyUiTest extends PlaywrightTestBase {
             a.setEvidenceAmount(new BigDecimal("750000"));
             a.setEvidenceAt(Instant.parse("2026-07-16T08:16:32Z"));
             a.setEvidenceVaNumber("811234567890");
-            a.setEvidenceBank("bsi");
+            a.setEvidenceBank("demo");
         }
         a.setRaisedBy("recon-ui-test");
         return anomalies.saveAndFlush(a);

@@ -99,7 +99,7 @@ class ReceivableAnomalyBookingIntegrationTest extends AbstractIntegrationTest {
         a.setEvidenceAmount(amount);
         a.setEvidenceAt(BANK_TIME);
         a.setEvidenceVaNumber(BANK_VA);
-        a.setEvidenceBank("bsi");
+        a.setEvidenceBank("demo");
         a.setRaisedBy("recon-test");
         return anomalies.saveAndFlush(a);
     }
@@ -158,7 +158,7 @@ class ReceivableAnomalyBookingIntegrationTest extends AbstractIntegrationTest {
                 .containsExactly("payment.received");
         assertThat(events.getLast().getPayload())
                 .contains("\"vaNumber\":\"" + BANK_VA + "\"")
-                .contains("\"bank\":\"bsi\"")
+                .contains("\"bank\":\"demo\"")
                 .contains("\"reference\":\"" + ref + "\"")
                 .contains("\"amount\":\"500000.00\"")
                 .contains("\"outstanding\":\"0.00\"")
