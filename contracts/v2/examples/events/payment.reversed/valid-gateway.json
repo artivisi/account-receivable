@@ -1,7 +1,7 @@
 {
-  "type": "payment.received",
-  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a10",
-  "occurredAt": "2026-08-27T15:36:32+07:00",
+  "type": "payment.reversed",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a50",
+  "occurredAt": "2026-10-09T14:22:08+07:00",
   "producer": "account-receivable",
   "payload": {
     "invoiceNumber": "2026082740999001",
@@ -9,12 +9,13 @@
     "vaNumber": "402600000001",
     "currency": "IDR",
     "amount": "2166667.00",
-    "cumulativePaid": "2166667.00",
-    "outstanding": "4333333.00",
+    "cumulativePaid": "0.00",
+    "outstanding": "6500000.00",
     "bank": "demo",
     "source": "GATEWAY",
     "reference": "202608271536320001",
-    "paidAt": "2026-08-27T15:36:32+07:00",
-    "invoiceStatus": "PARTIALLY_PAID"
+    "reversedAt": "2026-10-09T14:22:08+07:00",
+    "reason": "BANK_REVERSED",
+    "invoiceStatus": "OPEN"
   }
 }

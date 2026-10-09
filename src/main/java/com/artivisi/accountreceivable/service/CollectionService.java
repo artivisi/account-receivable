@@ -14,6 +14,7 @@ import com.artivisi.accountreceivable.entity.PaymentSchedule;
 import com.artivisi.accountreceivable.dto.CreditNoteRequest;
 import com.artivisi.accountreceivable.dto.CreditNoteResponse;
 import com.artivisi.accountreceivable.dto.InvoiceResponse;
+import com.artivisi.accountreceivable.dto.RecordPaymentRequest;
 import com.artivisi.accountreceivable.dto.IssueInvoiceRequest;
 import com.artivisi.accountreceivable.dto.DueDateOutcome;
 import com.artivisi.accountreceivable.dto.GatewayWebhookPayload;
@@ -528,8 +529,9 @@ public class CollectionService {
         // invoice uses the invoice's.
         LocalDate dueDate = installment != null ? installment.getDueDate() : receivable.getDueDate();
         Instant expiresAt = expiryFor(dueDate);
-        // What the payer reads on the ATM/mobile screen (BSI `keterangan`). Without it the bank
-        // shows a blank description where the legacy system showed the bill's purpose.
+        // What the payer reads on the ATM or mobile screen — the description field the bank's own
+        // inquiry response carries. Without it the bank shows a blank where the legacy system
+        // showed the bill's purpose.
         OpenedCharge opened = openLiveGatewayCharge(
                 targetReference, firstGeneration, payerName, amount, vaNumber, billNumber,
                 receivable.getDescription(), expiresAt);
@@ -684,6 +686,112 @@ public class CollectionService {
         notificationService.enqueue(notificationProperties.issuedConfig(), debtor.getEmail(), debtor.getPhone(),
                 NotificationSourceType.INVOICE_ISSUED, charge.getConsumerReference(),
                 payloadMapper.billIssued(data));
+    }
+
+    /**
+     * Book a payment the Payment Gateway never saw: cash at a counter, a transfer straight to an
+     * institution account, QRIS, a card on a terminal. The receiving application tells AR through
+     * {@code payment.recorded}; until this existed there was no way to, so those receivables stayed
+     * open for ever while the money sat in the bank.
+     *
+     * <p>Two things make this more than an insert. The first is that the receivable's VA is usually
+     * still live: a bill settled at the counter whose VA still asks for the full amount gets paid a
+     * second time, by a payer doing exactly what the bill told them to. {@link #carryToGateway}
+     * closes that — the charge is cancelled when nothing is left owing and repriced when something
+     * is — and it is the same path a credit note and an amendment already take, so the three cannot
+     * drift apart. The second is that the reference belongs to the sending application, not to a
+     * bank, which is why it is unique per {@link PaymentSource} and not globally: an SPMB receipt
+     * number that happens to equal a bank journal number must not be mistaken for a replay.
+     *
+     * <p>Nothing here parks money. The gateway path parks an over-payment because a bank cannot be
+     * told to send less; a recorded payment is a person typing a figure, and a figure larger than
+     * the debt is a mistake to correct at the counter, not a balance for AR to hold.
+     */
+    @Transactional
+    public CashApplicationResponse recordPayment(RecordPaymentRequest request) {
+        Invoice invoice = invoiceRepository.findById(request.invoiceId())
+                .orElseThrow(() -> new NotFoundException("Invoice not found: " + request.invoiceId()));
+        if (!invoice.isCollectible()) {
+            throw new InvalidRequestException("INVOICE_NOT_PAYABLE", "invoice " + invoice.getInvoiceNumber()
+                    + " is " + invoice.getPaymentStatus() + " and takes no payment");
+        }
+        if (invoice.getOutstanding().signum() == 0) {
+            throw new InvalidRequestException("INVOICE_NOT_PAYABLE",
+                    "invoice " + invoice.getInvoiceNumber() + " owes nothing");
+        }
+        if (!invoice.getCurrency().equals(request.currency())) {
+            // SCHEMA_INVALID rather than a code of its own: the published contract types `currency`
+            // as an enum of one, so a message naming another currency never reaches here from the
+            // broker. This guards the callers that do not go through the schema.
+            throw new InvalidRequestException("SCHEMA_INVALID", "invoice " + invoice.getInvoiceNumber()
+                    + " is in " + invoice.getCurrency() + ", payment in " + request.currency());
+        }
+        if (request.amount().compareTo(invoice.getOutstanding()) > 0) {
+            throw new InvalidRequestException("AMOUNT_INVALID", "payment " + request.amount()
+                    + " exceeds the " + invoice.getOutstanding() + " outstanding on " + invoice.getInvoiceNumber());
+        }
+        // A repeat under the same idempotency key is answered before it reaches here. The same
+        // receipt number arriving under a different key is a different claim about the same money,
+        // and the only safe answer is to refuse it: silently applying it would book the payment
+        // twice, and silently ignoring it would lose a genuine second payment that reused a number.
+        cashApplicationRepository.findBySourceAndPaymentReference(PaymentSource.RECORDED, request.reference())
+                .ifPresent(duplicate -> {
+                    throw new InvalidRequestException("REFERENCE_DUPLICATE", "receipt " + request.reference()
+                            + " is already booked as " + duplicate.getAmount() + " on "
+                            + duplicate.getReceivedAt() + "; a second payment needs its own number");
+                });
+
+        CashApplication application = new CashApplication();
+        application.setSource(PaymentSource.RECORDED);
+        application.setPaymentChannel(request.channel());
+        application.setPaymentReference(request.reference());
+        application.setAmount(request.amount());
+        application.setCurrency(request.currency());
+        application.setReceivedAt(request.receivedAt());
+        application.setNote(noteFor(request));
+        // No charge: this payment settled no VA. The column stays null rather than pointing at a
+        // charge it did not pay, which would overstate what the gateway collected.
+        if (invoice.isInstallment()) {
+            for (InvoiceService.PlanAllocation allocation
+                    : invoiceService.allocatePlanPayment(invoice.getId(), request.amount())) {
+                CashApplicationLine line = new CashApplicationLine();
+                line.setAllocatedAmount(allocation.amount());
+                line.setInstallment(allocation.installment());
+                application.addLine(line);
+            }
+        } else {
+            invoiceService.applyInvoicePayment(invoice.getId(), request.amount());
+            CashApplicationLine line = new CashApplicationLine();
+            line.setAllocatedAmount(request.amount());
+            line.setInvoice(invoice);
+            application.addLine(line);
+        }
+        application.setStatus(CashApplicationStatus.APPLIED);
+        CashApplication saved = cashApplicationRepository.save(application);
+
+        contractEvents.paymentReceived(null, null, saved, invoice);
+        // The VA is the hazard, not the ledger: cancelled when nothing is left owing, repriced when
+        // something is. No receipt is sent to the payer — the application that took the money at the
+        // counter is the one holding the receipt, and a second one from AR would read as a new bill.
+        carryToGateway(invoice, "PAYMENT_RECORDED");
+        auditService.record("PAYMENT_RECORDED", "Invoice", invoice.getId(),
+                invoice.getInvoiceNumber() + " amount=" + request.amount() + " channel=" + request.channel()
+                        + " reference=" + request.reference() + " receivedAt=" + request.receivedAt()
+                        + " status=" + invoice.getPaymentStatus()
+                        + (request.decisionReference() == null ? "" : " decision=" + request.decisionReference()));
+        return CashApplicationResponse.from(saved);
+    }
+
+    /** What the receipt says about itself, kept together in the one free-text field the row has. */
+    private static String noteFor(RecordPaymentRequest request) {
+        StringBuilder note = new StringBuilder("Recorded ").append(request.channel()).append(" payment");
+        if (request.reason() != null && !request.reason().isBlank()) {
+            note.append(": ").append(request.reason());
+        }
+        if (request.decisionReference() != null && !request.decisionReference().isBlank()) {
+            note.append(" (decision ").append(request.decisionReference()).append(")");
+        }
+        return note.toString();
     }
 
     /**
@@ -846,18 +954,44 @@ public class CollectionService {
         application.setReversedAt(Instant.now(clock));
         application.setReversalReason("BANK_REVERSED");
 
+        // Not every payment has a charge. One booked from a reconciliation finding carries whichever
+        // charge the finding named, which may be none, and a recorded counter payment never has one.
+        // Reaching through it unconditionally would fail the reversal with a null pointer and leave
+        // the money applied — the receivable overstated, and nobody told.
         Charge charge = application.getCharge();
-        charge.setCumulativePaid(charge.getCumulativePaid().subtract(application.getAmount()));
-        Invoice receivable = charge.getInvoice() != null
-                ? charge.getInvoice()
-                : charge.getInstallment().getSchedule().getInvoice();
+        if (charge != null) {
+            charge.setCumulativePaid(charge.getCumulativePaid().subtract(application.getAmount()));
+        }
+        Invoice receivable = receivableOf(application, charge);
         auditService.record("PAYMENT_REVERSED", "Invoice", receivable.getId(),
                 "amount=" + application.getAmount() + " ref=" + payload.bankReference());
         CashApplication saved = cashApplicationRepository.save(application);
         // Tell the upstream application. It raised its applicant's status on payment.received and has
         // no way of learning that the money went back.
-        contractEvents.paymentReversed(saved, receivable, charge.getVaNumber(), charge.getEscrowCode());
+        contractEvents.paymentReversed(saved, receivable,
+                charge == null ? null : charge.getVaNumber(),
+                charge == null ? null : charge.getEscrowCode());
         return CashApplicationResponse.from(saved);
+    }
+
+    /**
+     * The receivable a payment was applied to. The charge names it directly when there is one;
+     * without a charge the allocation lines do, which is the only record a counter payment leaves of
+     * what it settled.
+     */
+    private static Invoice receivableOf(CashApplication application, Charge charge) {
+        if (charge != null) {
+            return charge.getInvoice() != null
+                    ? charge.getInvoice()
+                    : charge.getInstallment().getSchedule().getInvoice();
+        }
+        for (CashApplicationLine line : application.getLines()) {
+            return line.getInvoice() != null
+                    ? line.getInvoice()
+                    : line.getInstallment().getSchedule().getInvoice();
+        }
+        throw new IllegalStateException("Cash application " + application.getId()
+                + " has neither a charge nor an allocation line, so what it paid cannot be established");
     }
 
     private CashApplicationResponse park(CashApplication application, Charge charge, String currency,

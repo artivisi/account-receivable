@@ -8,7 +8,7 @@
     "debtorCode": "2600000001",
     "vaNumber": "402600000001",
     "interbankVaNumber": "8888001402600000001",
-    "bank": "bsi",
+    "bank": "demo",
     "amount": "2166667.00",
     "expiresAt": "2026-11-10"
   }

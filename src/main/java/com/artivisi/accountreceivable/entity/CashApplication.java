@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A received payment. Idempotent on {@code paymentReference} (unique) — a replayed webhook
+ * A received payment. Idempotent on {@code (source, paymentReference)} — a replayed webhook
  * resolves to the same row. Allocation lines are added only when the payment is applied.
  */
 @Getter
@@ -37,6 +37,19 @@ public class CashApplication extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private PaymentSource source;
 
+    /**
+     * How the money arrived, for a {@link PaymentSource#RECORDED} payment. Null for a gateway
+     * payment, where the channel is the VA and the question does not arise.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_channel")
+    private PaymentChannel paymentChannel;
+
+    /**
+     * The charge this payment settled, where one did. Null for a payment that never passed through
+     * a VA: a {@link PaymentSource#RECORDED} receipt from a counter, and a gateway finding booked
+     * against an invoice whose charge was already spent.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_charge")
     private Charge charge;

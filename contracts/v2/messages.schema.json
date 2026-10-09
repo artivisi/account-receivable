@@ -29,6 +29,9 @@
       "$ref": "#/$defs/command.charge.openRequested"
     },
     {
+      "$ref": "#/$defs/command.payment.recorded"
+    },
+    {
       "$ref": "#/$defs/event.invoice.issued"
     },
     {
@@ -48,6 +51,9 @@
     },
     {
       "$ref": "#/$defs/event.payment.received"
+    },
+    {
+      "$ref": "#/$defs/event.payment.reversed"
     },
     {
       "$ref": "#/$defs/event.invoice.cancelled"
@@ -175,6 +181,24 @@
         "CORRECTION"
       ],
       "description": "SCHOLARSHIP: kewajibannya nyata dan dibayar pihak lain. DISCOUNT: harganya berkurang. CORRECTION: tagihannya salah."
+    },
+    "paymentSource": {
+      "type": "string",
+      "enum": [
+        "GATEWAY",
+        "RECORDED"
+      ],
+      "description": "Dari mana pembayaran ini masuk, dan karena itu nomor acuannya milik siapa. GATEWAY: bank, lewat webhook gateway, dengan VA yang terbayar. RECORDED: aplikasi hulu lewat payment.recorded, uangnya tidak melewati gateway sehingga tidak ada VA. Dua nomor acuan dari sumber berbeda boleh sama; keunikan dihitung per sumber."
+    },
+    "paymentChannel": {
+      "type": "string",
+      "enum": [
+        "CASH",
+        "TRANSFER",
+        "QRIS",
+        "EDC"
+      ],
+      "description": "Cara uang diterima di luar gateway. Tidak ada nilai penampung. Kanal yang belum terdaftar ditolak, sehingga penerimaan kas tetap dapat dipilah per kanal."
     },
     "envelope": {
       "type": "object",
@@ -535,6 +559,8 @@
             "VA_NUMBER_BUSY",
             "REFERENCE_REQUIRED",
             "DEBTOR_CODE_UNENCODABLE",
+            "INVOICE_NOT_PAYABLE",
+            "REFERENCE_DUPLICATE",
             "SCHEMA_INVALID"
           ]
         },
@@ -675,7 +701,8 @@
             "INVOICE_AMENDED",
             "INSTALLMENT_DUE",
             "PLAN_AMENDED",
-            "CREDIT_NOTE"
+            "CREDIT_NOTE",
+            "PAYMENT_RECORDED"
           ]
         }
       }
@@ -717,12 +744,11 @@
       "required": [
         "invoiceNumber",
         "debtorCode",
-        "vaNumber",
         "currency",
         "amount",
         "cumulativePaid",
         "outstanding",
-        "bank",
+        "source",
         "reference",
         "paidAt",
         "invoiceStatus"
@@ -769,8 +795,173 @@
             "PARTIALLY_PAID",
             "PAID"
           ]
+        },
+        "source": {
+          "$ref": "#/$defs/paymentSource"
+        },
+        "channel": {
+          "$ref": "#/$defs/paymentChannel"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "const": "GATEWAY"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "vaNumber",
+              "bank"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "const": "RECORDED"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "channel"
+            ],
+            "properties": {
+              "vaNumber": false
+            }
+          }
+        }
+      ]
+    },
+    "payload.payment.reversed": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pembayaran yang ditarik kembali dari buku: dibatalkan bank, atau dibatalkan keuangan karena tercatat pada tagihan yang salah. Angka-angkanya adalah keadaan tagihan SESUDAH pembatalan, jadi consumer menimpa nilai simpanannya tanpa menghitung pengurangan sendiri.",
+      "required": [
+        "invoiceNumber",
+        "debtorCode",
+        "currency",
+        "amount",
+        "cumulativePaid",
+        "outstanding",
+        "source",
+        "reference",
+        "reversedAt",
+        "invoiceStatus"
+      ],
+      "properties": {
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "sourceInvoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "debtorCode": {
+          "$ref": "#/$defs/debtorCode"
+        },
+        "vaNumber": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive",
+          "description": "Nominal yang ditarik kembali. Sisa tagihan ada di outstanding."
+        },
+        "cumulativePaid": {
+          "$ref": "#/$defs/money"
+        },
+        "outstanding": {
+          "$ref": "#/$defs/money"
+        },
+        "bank": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/paymentSource"
+        },
+        "channel": {
+          "$ref": "#/$defs/paymentChannel"
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reversedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decisionReference": {
+          "$ref": "#/$defs/decisionReference"
+        },
+        "invoiceStatus": {
+          "type": "string",
+          "enum": [
+            "OPEN",
+            "PARTIALLY_PAID",
+            "PAID",
+            "WRITTEN_OFF",
+            "CANCELLED"
+          ],
+          "description": "Status tagihan sesudah pembayaran ditarik. Seluruh nilai status diizinkan: pembayaran dapat dibatalkan jauh setelah tagihannya dihapusbukukan atau dibatalkan, dan event yang ditolak skema sendiri akan menghilangkan kabar pembatalan itu."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "const": "GATEWAY"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "vaNumber",
+              "bank"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "source"
+            ],
+            "properties": {
+              "source": {
+                "const": "RECORDED"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "channel"
+            ],
+            "properties": {
+              "vaNumber": false
+            }
+          }
+        }
+      ]
     },
     "payload.event.invoice.cancelled": {
       "type": "object",
@@ -1173,6 +1364,23 @@
         }
       ]
     },
+    "event.payment.reversed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "payment.reversed"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.payment.reversed"
+            }
+          }
+        }
+      ]
+    },
     "event.invoice.cancelled": {
       "allOf": [
         {
@@ -1240,6 +1448,54 @@
         }
       }
     },
+    "payload.payment.recorded": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pembayaran yang diterima di luar gateway — tunai di loket, transfer langsung, QRIS, EDC — dicatatkan ke AR oleh aplikasi yang menerimanya. Tanpa perintah ini tagihannya tetap terbuka selamanya dan VA-nya tetap menagih uang yang sudah dibayar.",
+      "required": [
+        "idempotencyKey",
+        "invoiceNumber",
+        "currency",
+        "amount",
+        "paidAt",
+        "channel",
+        "reference"
+      ],
+      "properties": {
+        "idempotencyKey": {
+          "$ref": "#/$defs/idempotencyKey"
+        },
+        "invoiceNumber": {
+          "$ref": "#/$defs/invoiceNumber"
+        },
+        "currency": {
+          "$ref": "#/$defs/currency"
+        },
+        "amount": {
+          "$ref": "#/$defs/moneyPositive",
+          "description": "Uang yang benar-benar diterima. Melebihi sisa tagihan ditolak AMOUNT_INVALID. Kelebihan bayar adalah keputusan orang, dan AR tidak membukukannya sendiri."
+        },
+        "paidAt": {
+          "$ref": "#/$defs/timestamp",
+          "description": "Kapan uangnya diterima. Dipakai apa adanya sebagai tanggal penerimaan kas, termasuk ketika pencatatannya terlambat berhari-hari."
+        },
+        "channel": {
+          "$ref": "#/$defs/paymentChannel"
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Nomor bukti penerimaan di aplikasi pengirim: nomor kuitansi loket, nomor transaksi QRIS, atau nomor jurnal transfer. Menjadi identitas pembayaran di AR pada ruang nama RECORDED, sehingga boleh sama dengan nomor jurnal bank. Nomor yang sama dengan idempotencyKey berbeda ditolak REFERENCE_DUPLICATE."
+        },
+        "reason": {
+          "$ref": "#/$defs/reasonText"
+        },
+        "decisionReference": {
+          "$ref": "#/$defs/decisionReference"
+        }
+      }
+    },
     "command.charge.openRequested": {
       "allOf": [
         {
@@ -1252,6 +1508,23 @@
             },
             "payload": {
               "$ref": "#/$defs/payload.charge.openRequested"
+            }
+          }
+        }
+      ]
+    },
+    "command.payment.recorded": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/envelope"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "payment.recorded"
+            },
+            "payload": {
+              "$ref": "#/$defs/payload.payment.recorded"
             }
           }
         }

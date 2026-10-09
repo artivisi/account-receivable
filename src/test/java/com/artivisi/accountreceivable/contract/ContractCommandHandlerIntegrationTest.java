@@ -408,10 +408,14 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         String invoiceId = invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getId();
         assertThat(chargeRepository.findByInvoiceId(invoiceId))
                 .allMatch(c -> c.getStatus() == ChargeStatus.CANCELLED);
+        // Retiring the VA is announced: the upstream mirror cannot work out on its own that the
+        // number it still shows the payer has stopped answering.
+        assertThat(eventsFor(DEBTOR, before + 1)).extracting(ContractEventOutbox::getEventType)
+                .containsExactly("charge.cancelled");
 
         // Cancelled is final: a further amendment is refused as such, with the code the spec names.
         handler.handle("invoice-command", fixture("commands/invoice.amended/valid-amount-only.json", invoiceNumber));
-        List<ContractEventOutbox> after = eventsFor(DEBTOR, before + 1);
+        List<ContractEventOutbox> after = eventsFor(DEBTOR, before + 2);
         assertThat(after).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
         assertThat(payloadOf(after.get(0)).get("code").asText()).isEqualTo("INVOICE_NOT_AMENDABLE");
     }
@@ -453,6 +457,200 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(validate(eventsFor(DEBTOR, before).get(0))).isEmpty();
         assertThat(auditDetail("INVOICE_CANCELLED", invoiceNumber)).contains("reference=KNV-2026-0007");
         cancellationDispatcher.dispatchDue();
+    }
+
+    // ------------------------------------------------------------------ payment.recorded
+
+    /** A recorded-payment command with a fresh key, aimed at one invoice, for one amount. */
+    private static String recordedOf(String fixture, String invoiceNumber, String amount) throws IOException {
+        ObjectNode root = (ObjectNode) JSON.readTree(fixture("commands/payment.recorded/" + fixture));
+        ObjectNode payload = (ObjectNode) root.get("payload");
+        String suffix = UUID.randomUUID().toString();
+        payload.put("idempotencyKey", payload.get("idempotencyKey").asText() + ":" + suffix);
+        payload.put("reference", payload.get("reference").asText() + "-" + suffix);
+        if (invoiceNumber != null) {
+            payload.put("invoiceNumber", invoiceNumber);
+        }
+        if (amount != null) {
+            payload.put("amount", amount);
+        }
+        return JSON.writeValueAsString(root);
+    }
+
+    @Test
+    void recordedInFull_booksTheCashAndStopsTheVaAskingForMoney() throws IOException {
+        String invoiceNumber = issueSingle();
+        resetGatewayCancelStub();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+        String message = recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "6500000.00");
+
+        handler.handle("invoice-command", message);
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("payment.received");
+        JsonNode p = payloadOf(events.getFirst());
+        assertThat(p.get("source").asText()).isEqualTo("RECORDED");
+        assertThat(p.get("channel").asText()).isEqualTo("CASH");
+        // No VA was settled, so no VA number is reported — the schema forbids inventing one.
+        assertThat(p.has("vaNumber")).isFalse();
+        assertThat(p.has("bank")).isFalse();
+        assertThat(p.get("amount").asText()).isEqualTo("6500000.00");
+        assertThat(p.get("outstanding").asText()).isEqualTo("0.00");
+        assertThat(p.get("invoiceStatus").asText()).isEqualTo("PAID");
+        assertThat(p.get("reference").asText()).isEqualTo(
+                JSON.readTree(message).get("payload").get("reference").asText());
+        assertThat(p.get("paidAt").asText()).startsWith("2026-10-09T09:58");
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getPaymentStatus())
+                .isEqualTo(PaymentStatus.PAID);
+
+        // The whole point: a bill settled at the counter must stop being payable, or the payer pays
+        // it a second time by doing exactly what the bill told them to.
+        cancellationDispatcher.dispatchDue();
+        assertThat(gatewayCancelCount()).isEqualTo(1);
+        String invoiceId = invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getId();
+        assertThat(chargeRepository.findByInvoiceId(invoiceId))
+                .allMatch(c -> c.getStatus() == ChargeStatus.CANCELLED);
+        // And the upstream mirror must be told the VA is dead. It cannot derive this: AR decided it,
+        // not the sender, and a mirror still showing a live VA keeps offering a number that answers
+        // NOT_FOUND at the bank.
+        assertThat(eventsFor(DEBTOR, mark + 1)).extracting(ContractEventOutbox::getEventType)
+                .containsExactly("charge.cancelled");
+        assertThat(payloadOf(eventsFor(DEBTOR, mark + 1).getFirst()).get("reason").asText())
+                .isEqualTo("INVOICE_PAID");
+    }
+
+    @Test
+    void recordedInPart_repricesTheVaToWhatIsLeft() throws IOException {
+        String invoiceNumber = issueSingle();
+        int repricesBefore = gatewayRepriceCount();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", recordedOf("valid-qris-part-payment.json", invoiceNumber, "1500000.00"));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType)
+                .containsExactly("payment.received", "charge.repriced");
+        assertThat(payloadOf(events.get(1)).get("amount").asText()).isEqualTo("5000000.00");
+        assertThat(payloadOf(events.get(1)).get("reason").asText()).isEqualTo("PAYMENT_RECORDED");
+        JsonNode paid = payloadOf(events.get(0));
+        assertThat(paid.get("channel").asText()).isEqualTo("QRIS");
+        assertThat(paid.get("cumulativePaid").asText()).isEqualTo("1500000.00");
+        assertThat(paid.get("outstanding").asText()).isEqualTo("5000000.00");
+        assertThat(paid.get("invoiceStatus").asText()).isEqualTo("PARTIALLY_PAID");
+        assertThat(gatewayRepriceCount()).as("the VA must ask for the remainder, not the original")
+                .isEqualTo(repricesBefore + 1);
+    }
+
+    @Test
+    void recordedTwiceUnderTheSameKey_booksOnce() throws IOException {
+        String invoiceNumber = issueSingle();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+        String message = recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "350000.00");
+
+        handler.handle("invoice-command", message);
+        handler.handle("invoice-command", message);
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType)
+                .as("the repeat is answered from the idempotency store, not booked again")
+                .containsExactly("payment.received", "charge.repriced", "payment.received");
+        assertThat(events.get(2).getPayload()).isEqualTo(events.get(0).getPayload());
+        assertThat(events.get(2).getTopic()).as("republished to the topic it first went to")
+                .isEqualTo(events.get(0).getTopic());
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getOutstanding())
+                .isEqualByComparingTo("6150000.00");
+    }
+
+    @Test
+    void recordedWithAReferenceAlreadyBooked_isRefused() throws IOException {
+        String invoiceNumber = issueSingle();
+        String first = recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "350000.00");
+        handler.handle("invoice-command", first);
+        String reference = JSON.readTree(first).get("payload").get("reference").asText();
+        // Same receipt number, different idempotency key: a second claim about the same money.
+        ObjectNode root = (ObjectNode) JSON.readTree(recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "350000.00"));
+        ((ObjectNode) root.get("payload")).put("reference", reference);
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", JSON.writeValueAsString(root));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("REFERENCE_DUPLICATE");
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getOutstanding())
+                .as("the second claim books nothing").isEqualByComparingTo("6150000.00");
+    }
+
+    @Test
+    void recordedAboveOutstanding_isRefusedRatherThanParked() throws IOException {
+        String invoiceNumber = issueSingle();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", recordedOf("rejected-exceeds-outstanding.json", invoiceNumber, "6500001.00"));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("AMOUNT_INVALID");
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getOutstanding())
+                .isEqualByComparingTo("6500000.00");
+    }
+
+    @Test
+    void recordedAgainstASettledInvoice_isRefused() throws IOException {
+        String invoiceNumber = issueSingle();
+        handler.handle("invoice-command", recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "6500000.00"));
+        cancellationDispatcher.dispatchDue();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "100000.00"));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("INVOICE_NOT_PAYABLE");
+    }
+
+    /** The schema refuses it before AR looks at the invoice: `currency` is an enum of one. */
+    @Test
+    void recordedInAnotherCurrency_isRefused() throws IOException {
+        String invoiceNumber = issueSingle();
+        ObjectNode root = (ObjectNode) JSON.readTree(recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "350000.00"));
+        ((ObjectNode) root.get("payload")).put("currency", "USD");
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", JSON.writeValueAsString(root));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("SCHEMA_INVALID");
+    }
+
+    @Test
+    void recordedForAnUnknownInvoice_isRefused() throws IOException {
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", recordedOf("rejected-unknown-invoice.json", null, null));
+
+        // Keyed by the correlation id, because no debtor could be resolved from an unknown invoice.
+        List<ContractEventOutbox> all = outbox.findAll().stream()
+                .filter(r -> "invoice.rejected".equals(r.getEventType())).toList();
+        assertThat(all).isNotEmpty();
+        ContractEventOutbox last = all.getLast();
+        assertThat(payloadOf(last).get("code").asText()).isEqualTo("INVOICE_NOT_FOUND");
+        assertThat(outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR)).hasSize(mark);
+    }
+
+    @Test
+    void recordedWithAnUnknownChannel_isRefusedBySchema() throws IOException {
+        String invoiceNumber = issueSingle();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", recordedOf("invalid-unknown-channel.json", invoiceNumber, null));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("SCHEMA_INVALID");
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getOutstanding())
+                .isEqualByComparingTo("6500000.00");
     }
 
     private String auditDetail(String eventType, String invoiceNumber) {

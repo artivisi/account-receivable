@@ -5,12 +5,14 @@ import com.artivisi.accountreceivable.dto.CreditNoteRequest;
 import com.artivisi.accountreceivable.dto.CreditNoteResponse;
 import com.artivisi.accountreceivable.dto.DebtorRequest;
 import com.artivisi.accountreceivable.dto.IssueInvoiceRequest;
+import com.artivisi.accountreceivable.dto.RecordPaymentRequest;
 import com.artivisi.accountreceivable.entity.Charge;
 import com.artivisi.accountreceivable.entity.ChargeStatus;
 import com.artivisi.accountreceivable.entity.CreditReason;
 import com.artivisi.accountreceivable.entity.Debtor;
 import com.artivisi.accountreceivable.entity.DebtorStatus;
 import com.artivisi.accountreceivable.entity.Invoice;
+import com.artivisi.accountreceivable.entity.PaymentChannel;
 import com.artivisi.accountreceivable.exception.InvalidRequestException;
 import com.artivisi.accountreceivable.repository.ChargeRepository;
 import com.artivisi.accountreceivable.repository.DebtorRepository;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -68,8 +71,21 @@ public class ContractCommandService {
         this.properties = properties;
     }
 
-    /** What a command produced: the event that answers it (null when none does) and the key it belongs under. */
-    public record CommandResult(String messageKey, String resultPayload) {
+    /**
+     * What a command produced: the event that answers it (null when none does), the key it belongs
+     * under, and the topic it was published to. The topic is part of the result because a repeat is
+     * answered by republishing the stored event, and an event republished to the wrong topic is
+     * worse than none: the sender waits on a topic it will never arrive on.
+     */
+    public record CommandResult(String messageKey, String resultPayload, String resultTopic) {
+    }
+
+    private CommandResult onInvoiceEvent(String messageKey, String resultPayload) {
+        return new CommandResult(messageKey, resultPayload, properties.topics().invoiceEvent());
+    }
+
+    private CommandResult onPaymentEvent(String messageKey, String resultPayload) {
+        return new CommandResult(messageKey, resultPayload, properties.topics().paymentEvent());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -84,6 +100,7 @@ public class ContractCommandService {
                 case "invoice.announcementRequested" -> announcementRequested(payload);
                 case "charge.openRequested" -> chargeOpenRequested(payload);
                 case "debtor.upserted" -> debtorUpserted(payload);
+                case "payment.recorded" -> paymentRecorded(payload);
                 default -> throw new ContractRejectedException("SCHEMA_INVALID", "unknown command type " + type);
             };
         } catch (InvalidRequestException e) {
@@ -130,7 +147,7 @@ public class ContractCommandService {
         if (!p.hasNonNull("openCharge") || p.get("openCharge").asBoolean()) {
             collectionService.openChargeForInvoice(issued.id());
         }
-        return new CommandResult(debtorCode, result);
+        return onInvoiceEvent(debtorCode, result);
     }
 
     private CommandResult invoiceAmended(JsonNode p) {
@@ -151,7 +168,7 @@ public class ContractCommandService {
             }
         }
         Invoice after = invoiceRepository.findById(invoice.getId()).orElseThrow();
-        return new CommandResult(after.getDebtor().getCode(), events.invoiceIssued(after, p.get("idempotencyKey").asText()));
+        return onInvoiceEvent(after.getDebtor().getCode(), events.invoiceIssued(after, p.get("idempotencyKey").asText()));
     }
 
     private CommandResult planAmended(JsonNode p, String producer) {
@@ -161,7 +178,7 @@ public class ContractCommandService {
         collectionService.amendPlan(invoice.getId(), legs, p.get("reason").asText(), reference(p), producer,
                 p.get("idempotencyKey").asText());
         // planAmended's own event is emitted by the service, on every path.
-        return new CommandResult(invoice.getDebtor().getCode(), null);
+        return onInvoiceEvent(invoice.getDebtor().getCode(), null);
     }
 
     private CommandResult invoiceCancelled(JsonNode p, String producer) {
@@ -178,7 +195,7 @@ public class ContractCommandService {
             }
         }
         String note = p.hasNonNull("note") ? p.get("note").asText() : null;
-        return new CommandResult(invoice.getDebtor().getCode(),
+        return onInvoiceEvent(invoice.getDebtor().getCode(),
                 invoiceService.cancel(invoice.getId(), reason, replacedBy, note, reference(p), producer));
     }
 
@@ -209,7 +226,7 @@ public class ContractCommandService {
                 p.hasNonNull("reference") ? p.get("reference").asText() : null,
                 p.get("reason").asText()));
         Invoice after = invoiceRepository.findById(invoice.getId()).orElseThrow();
-        return new CommandResult(after.getDebtor().getCode(),
+        return onInvoiceEvent(after.getDebtor().getCode(),
                 events.invoiceCredited(after, note, p.get("idempotencyKey").asText(), producer));
     }
 
@@ -223,7 +240,39 @@ public class ContractCommandService {
         assertAmendable(invoice);
         collectionService.openDeferredChargeForInvoice(invoice.getId());
         String debtorCode = invoice.getDebtor().getCode();
-        return new CommandResult(debtorCode, events.lastEvent(debtorCode, "charge.opened"));
+        return onInvoiceEvent(debtorCode, events.lastEvent(debtorCode, "charge.opened"));
+    }
+
+    /**
+     * Book a payment the gateway never carried: cash at a counter, a direct transfer, QRIS, a card
+     * terminal. The answering event is {@code payment.received} with {@code source: RECORDED} — the
+     * same event the bank rail produces, because a campus app raises its applicant's status from
+     * that event and from nothing else.
+     *
+     * <p>It is answered on the payment topic, not the invoice topic, which is why
+     * {@link CommandResult} carries the topic. Rejections still arrive as {@code invoice.rejected}
+     * on the invoice event topic, as for every other command.
+     */
+    private CommandResult paymentRecorded(JsonNode p) {
+        Invoice invoice = load(p.get("invoiceNumber").asText());
+        PaymentChannel channel;
+        try {
+            channel = PaymentChannel.valueOf(p.get("channel").asText());
+        } catch (IllegalArgumentException e) {
+            throw new ContractRejectedException("SCHEMA_INVALID", "channel " + p.get("channel").asText()
+                    + " is not one of " + List.of(PaymentChannel.values()));
+        }
+        collectionService.recordPayment(new RecordPaymentRequest(
+                invoice.getId(),
+                new BigDecimal(p.get("amount").asText()),
+                p.get("currency").asText(),
+                OffsetDateTime.parse(p.get("paidAt").asText()).toInstant(),
+                channel,
+                p.get("reference").asText(),
+                p.hasNonNull("reason") ? p.get("reason").asText() : null,
+                decisionReference(p)));
+        String debtorCode = invoice.getDebtor().getCode();
+        return onPaymentEvent(debtorCode, events.lastEvent(debtorCode, "payment.received"));
     }
 
     private CommandResult announcementRequested(JsonNode p) {
@@ -233,7 +282,7 @@ public class ContractCommandService {
                 .filter(c -> c.getStatus() == ChargeStatus.ACTIVE)
                 .findFirst()
                 .ifPresent(live -> events.chargeOpened(live, invoice));
-        return new CommandResult(invoice.getDebtor().getCode(), result);
+        return onInvoiceEvent(invoice.getDebtor().getCode(), result);
     }
 
     private CommandResult debtorUpserted(JsonNode p) {
@@ -248,7 +297,7 @@ public class ContractCommandService {
         } else {
             debtorService.update(existing.getId(), request);
         }
-        return new CommandResult(code, null);
+        return onInvoiceEvent(code, null);
     }
 
     // ------------------------------------------------------------------ helpers
@@ -296,6 +345,14 @@ public class ContractCommandService {
      */
     private static String reference(JsonNode p) {
         return p.hasNonNull("reference") ? p.get("reference").asText() : null;
+    }
+
+    /**
+     * The same approval, under its own name. {@code payment.recorded} spends {@code reference} on
+     * the receipt number, so the approval behind the payment is a separate field there.
+     */
+    private static String decisionReference(JsonNode p) {
+        return p.hasNonNull("decisionReference") ? p.get("decisionReference").asText() : null;
     }
 
     private static void assertAmendable(Invoice invoice) {

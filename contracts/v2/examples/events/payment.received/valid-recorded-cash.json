@@ -1,0 +1,19 @@
+{
+  "type": "payment.received",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a52",
+  "occurredAt": "2026-10-09T10:12:05+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "invoiceNumber": "2026082740999002",
+    "debtorCode": "2600000001",
+    "currency": "IDR",
+    "amount": "350000.00",
+    "cumulativePaid": "350000.00",
+    "outstanding": "0.00",
+    "source": "RECORDED",
+    "channel": "CASH",
+    "reference": "KW-2026-004417",
+    "paidAt": "2026-10-09T09:58:00+07:00",
+    "invoiceStatus": "PAID"
+  }
+}

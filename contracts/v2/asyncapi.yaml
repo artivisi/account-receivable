@@ -21,7 +21,10 @@ servers:
 channels:
   invoiceCommand:
     address: invoice-command-v2
-    description: Perintah dari aplikasi hulu ke AR tentang tagihan. Key = debtorCode.
+    description: |
+      Perintah dari aplikasi hulu ke AR tentang tagihan. Key = debtorCode.
+      payment.recorded ikut di topic ini supaya satu debitur selalu terbaca berurutan:
+      pembayaran tidak dapat mendahului tagihan yang dibayarnya.
     messages:
       invoice.requested: { $ref: '#/components/messages/invoice.requested' }
       invoice.amended: { $ref: '#/components/messages/invoice.amended' }
@@ -30,6 +33,7 @@ channels:
       invoice.credited: { $ref: '#/components/messages/invoice.credited' }
       invoice.announcementRequested: { $ref: '#/components/messages/invoice.announcementRequested' }
       charge.openRequested: { $ref: '#/components/messages/charge.openRequested' }
+      payment.recorded: { $ref: '#/components/messages/payment.recorded' }
   debtorCommand:
     address: debtor-command-v2
     description: Pendaftaran dan pembaruan debitur. Key = debtorCode.
@@ -53,9 +57,13 @@ channels:
       charge.cancelled: { $ref: '#/components/messages/charge.cancelled' }
   paymentEvent:
     address: payment-event-v2
-    description: Pembayaran yang diterima. Key = debtorCode.
+    description: |
+      Pembayaran yang diterima dan pembayaran yang ditarik kembali. Key = debtorCode.
+      Pembatalan berada di topic yang sama dengan penerimaannya, supaya consumer yang
+      sudah menaikkan status pembayarnya pasti mendapat kabar ketika uangnya ditarik.
     messages:
       payment.received: { $ref: '#/components/messages/payment.received' }
+      payment.reversed: { $ref: '#/components/messages/payment.reversed' }
 
 operations:
   sendInvoiceCommand:
@@ -93,3 +101,5 @@ components:
     charge.repriced:                { name: charge.repriced, payload: { $ref: 'messages.schema.json#/$defs/event.charge.repriced' } }
     charge.cancelled:               { name: charge.cancelled, payload: { $ref: 'messages.schema.json#/$defs/event.charge.cancelled' } }
     payment.received:               { name: payment.received, payload: { $ref: 'messages.schema.json#/$defs/event.payment.received' } }
+    payment.reversed:               { name: payment.reversed, payload: { $ref: 'messages.schema.json#/$defs/event.payment.reversed' } }
+    payment.recorded:               { name: payment.recorded, payload: { $ref: 'messages.schema.json#/$defs/command.payment.recorded' } }

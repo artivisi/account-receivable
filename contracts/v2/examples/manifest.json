@@ -275,6 +275,64 @@
       "schemaRef": "#/$defs/event.invoice.rejected",
       "schemaValid": true,
       "note": "Penolakan charge.openRequested: nomor VA-nya masih menagih tagihan lain milik debitur dan jenis yang sama."
+    },
+    {
+      "file": "examples/commands/payment.recorded/valid-cash-settles-invoice.json",
+      "schemaRef": "#/$defs/command.payment.recorded",
+      "schemaValid": true,
+      "note": "Pembayaran tunai di loket yang melunasi tagihan. AR menjawab payment.received dengan source RECORDED, lalu membatalkan charge-nya supaya VA-nya tidak dibayar untuk kedua kalinya."
+    },
+    {
+      "file": "examples/commands/payment.recorded/valid-qris-part-payment.json",
+      "schemaRef": "#/$defs/command.payment.recorded",
+      "schemaValid": true,
+      "note": "Pembayaran sebagian lewat QRIS. Charge-nya tetap hidup dengan nominal yang diturunkan sampai sisa tagihan (charge.repriced, reason PAYMENT_RECORDED)."
+    },
+    {
+      "file": "examples/commands/payment.recorded/invalid-unknown-channel.json",
+      "schemaRef": "#/$defs/command.payment.recorded",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID",
+      "note": "Kanal di luar daftar ditolak. Penerimaan kas harus tetap dapat dipilah per kanal."
+    },
+    {
+      "file": "examples/commands/payment.recorded/invalid-missing-reference.json",
+      "schemaRef": "#/$defs/command.payment.recorded",
+      "schemaValid": false,
+      "rejection": "SCHEMA_INVALID",
+      "note": "Tanpa nomor bukti, pembayaran ini tidak punya identitas dan pengulangan perintah tidak dapat dibedakan dari pembayaran kedua."
+    },
+    {
+      "file": "examples/commands/payment.recorded/rejected-exceeds-outstanding.json",
+      "schemaRef": "#/$defs/command.payment.recorded",
+      "schemaValid": true,
+      "rejection": "AMOUNT_INVALID",
+      "note": "Lolos skema; ditolak AR karena melebihi sisa tagihan. Kelebihan bayar di loket adalah kesalahan yang diperbaiki di loket, dan AR tidak menampungnya sebagai saldo."
+    },
+    {
+      "file": "examples/commands/payment.recorded/rejected-unknown-invoice.json",
+      "schemaRef": "#/$defs/command.payment.recorded",
+      "schemaValid": true,
+      "rejection": "INVOICE_NOT_FOUND",
+      "note": "Lolos skema; ditolak AR."
+    },
+    {
+      "file": "examples/events/payment.received/valid-recorded-cash.json",
+      "schemaRef": "#/$defs/event.payment.received",
+      "schemaValid": true,
+      "note": "Satu jenis event untuk semua jalur. source RECORDED tidak membawa vaNumber dan bank karena uangnya tidak melewati VA; channel menggantikan keduanya."
+    },
+    {
+      "file": "examples/events/payment.reversed/valid-gateway.json",
+      "schemaRef": "#/$defs/event.payment.reversed",
+      "schemaValid": true,
+      "note": "Pembayaran yang dibatalkan bank. Angka-angkanya adalah keadaan tagihan sesudah pembatalan: consumer menimpa nilai simpanannya tanpa menghitung pengurangan sendiri."
+    },
+    {
+      "file": "examples/events/payment.reversed/valid-recorded.json",
+      "schemaRef": "#/$defs/event.payment.reversed",
+      "schemaValid": true,
+      "note": "Pembatalan kuitansi loket. decisionReference menunjuk berita acara pembatalannya."
     }
   ]
 }

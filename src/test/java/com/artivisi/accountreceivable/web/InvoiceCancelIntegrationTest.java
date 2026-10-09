@@ -48,10 +48,14 @@ class InvoiceCancelIntegrationTest extends AbstractIntegrationTest {
         dispatcher.dispatchDue();
         assertThat(chargeRepository.findByInvoiceId(wrong)).allMatch(c -> c.getStatus() == ChargeStatus.CANCELLED);
         List<ContractEventOutbox> events = outbox.findByMessageKeyOrderByCreatedAtAsc("cancel-rest");
-        assertThat(events.subList(before, events.size())).extracting(ContractEventOutbox::getEventType)
-                .containsExactly("invoice.cancelled");
-        assertThat(events.getLast().getPayload()).contains("\"replacedBy\":\"" + rightNumber + "\"")
+        List<ContractEventOutbox> announced = events.subList(before, events.size());
+        // Two separate facts, and the upstream mirror needs both: the debt is withdrawn, and the VA
+        // that was collecting it has stopped answering.
+        assertThat(announced).extracting(ContractEventOutbox::getEventType)
+                .containsExactly("invoice.cancelled", "charge.cancelled");
+        assertThat(announced.get(0).getPayload()).contains("\"replacedBy\":\"" + rightNumber + "\"")
                 .contains("\"decidedBy\":\"api\"");
+        assertThat(announced.get(1).getPayload()).contains("\"reason\":\"INVOICE_CANCELLED\"");
 
         // Final: a second cancellation is refused rather than repeated.
         given().contentType("application/json").body(Map.of("reason", "DUPLICATE"))

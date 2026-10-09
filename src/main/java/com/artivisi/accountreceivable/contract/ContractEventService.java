@@ -8,6 +8,7 @@ import com.artivisi.accountreceivable.entity.ContractEventOutbox;
 import com.artivisi.accountreceivable.entity.ContractOutboxStatus;
 import com.artivisi.accountreceivable.entity.Installment;
 import com.artivisi.accountreceivable.entity.Invoice;
+import com.artivisi.accountreceivable.entity.PaymentSource;
 import com.artivisi.accountreceivable.repository.ContractEventOutboxRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -204,25 +205,69 @@ public class ContractEventService {
     }
 
     /**
-     * The same event for a payment that reached the books without a charge carrying it — booked from
-     * a reconciliation finding, where the VA and the bank come from the bank's own record. The payload
-     * is identical field for field: a campus app applies it exactly as it applies a live payment.
+     * The same event for a payment that reached the books without a charge carrying it. Two kinds
+     * arrive this way: one booked from a reconciliation finding, where the VA and the bank come from
+     * the bank's own record, and one recorded at a counter, which passed through no VA at all.
+     *
+     * <p>One event type for every rail, on purpose. A campus app raises its applicant's status from
+     * {@code payment.received} and from nothing else, so a second event type for cash would be read
+     * by the apps that happened to add it and silently ignored by the rest — and a payment nobody
+     * acted on is the failure this command exists to end. {@code source} says which rail it was, and
+     * the fields that only one rail has are absent on the other rather than filled in.
      */
     public String paymentReceived(String vaNumber, String bank, CashApplication application, Invoice invoice) {
         ObjectNode p = JSON.createObjectNode();
         putInvoiceNumbers(p, invoice);
         p.put("debtorCode", invoice.getDebtor().getCode());
-        p.put("vaNumber", vaNumber);
+        putNullable(p, "vaNumber", vaNumber);
         p.put("currency", invoice.getCurrency());
         p.put("amount", money(application.getAmount()));
         p.put("cumulativePaid", money(invoice.getAmount().subtract(invoice.getOutstanding())));
         p.put("outstanding", money(invoice.getOutstanding()));
-        p.put("bank", bank);
+        putNullable(p, "bank", bank);
+        putPaymentSource(p, application, vaNumber, bank);
         p.put("reference", application.getPaymentReference());
         p.put("paidAt", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
                 OffsetDateTime.ofInstant(application.getReceivedAt(), clock.getZone())));
         p.put("invoiceStatus", invoice.getPaymentStatus().name());
         return enqueue(properties.topics().paymentEvent(), invoice.getDebtor().getCode(), "payment.received", p);
+    }
+
+    /**
+     * Write {@code source} and whichever of {@code channel} the source requires, refusing to emit a
+     * payment event the published schema would reject.
+     *
+     * <p>Loud rather than lenient, because the alternative is worse than a failed transaction: an
+     * event missing a field the contract makes conditional on its own {@code source} is dropped by a
+     * validating consumer, and a dropped payment event leaves a paid applicant reading as unpaid
+     * with nothing in either system to show why.
+     */
+    private static void putPaymentSource(ObjectNode p, CashApplication application,
+                                         String vaNumber, String bank) {
+        PaymentSource source = application.getSource();
+        if (source == null) {
+            throw new IllegalStateException(
+                    "Cash application " + application.getId() + " has no source; cannot say where the payment came from");
+        }
+        p.put("source", source.name());
+        switch (source) {
+            case GATEWAY -> {
+                if (vaNumber == null || bank == null) {
+                    throw new IllegalStateException("A GATEWAY payment event needs both vaNumber and bank; reference "
+                            + application.getPaymentReference() + " has va=" + vaNumber + " bank=" + bank);
+                }
+            }
+            case RECORDED -> {
+                if (application.getPaymentChannel() == null) {
+                    throw new IllegalStateException("A RECORDED payment needs a channel; reference "
+                            + application.getPaymentReference() + " has none");
+                }
+                if (vaNumber != null) {
+                    throw new IllegalStateException("A RECORDED payment passed through no VA, yet one was given: " + vaNumber);
+                }
+                p.put("channel", application.getPaymentChannel().name());
+            }
+        }
     }
 
     /**
@@ -245,7 +290,7 @@ public class ContractEventService {
         p.put("cumulativePaid", money(invoice.getAmount().subtract(invoice.getOutstanding())));
         p.put("outstanding", money(invoice.getOutstanding()));
         putNullable(p, "bank", bank);
-        p.put("source", application.getSource().name());
+        putPaymentSource(p, application, vaNumber, bank);
         p.put("reference", application.getPaymentReference());
         p.put("reversedAt", DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
                 OffsetDateTime.ofInstant(application.getReversedAt(), clock.getZone())));

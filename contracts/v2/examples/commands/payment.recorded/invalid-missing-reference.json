@@ -1,0 +1,14 @@
+{
+  "type": "payment.recorded",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a43",
+  "occurredAt": "2026-10-09T12:05:00+07:00",
+  "producer": "siakad-be",
+  "payload": {
+    "idempotencyKey": "siakad:kuitansi:tanpa-nomor",
+    "invoiceNumber": "2026082740999002",
+    "currency": "IDR",
+    "amount": "350000.00",
+    "paidAt": "2026-10-09T11:55:00+07:00",
+    "channel": "CASH"
+  }
+}

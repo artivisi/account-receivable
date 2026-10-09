@@ -1,6 +1,5 @@
 package com.artivisi.accountreceivable.contract;
 
-import com.artivisi.accountreceivable.config.ArContractProperties;
 import com.artivisi.accountreceivable.entity.ContractCommand;
 import com.artivisi.accountreceivable.entity.ContractFailure;
 import com.artivisi.accountreceivable.repository.ContractCommandRepository;
@@ -45,7 +44,6 @@ public class ContractCommandHandler {
     private final ContractEventService events;
     private final ContractCommandRepository commandRepository;
     private final ContractFailureRepository failureRepository;
-    private final ArContractProperties properties;
     private final Clock clock;
     private final JsonSchemaFactory schemaFactory;
     private final SchemaValidatorsConfig schemaConfig;
@@ -54,12 +52,11 @@ public class ContractCommandHandler {
     public ContractCommandHandler(ContractCommandService commands, ContractEventService events,
                                   ContractCommandRepository commandRepository,
                                   ContractFailureRepository failureRepository,
-                                  ArContractProperties properties, Clock clock) {
+                                  Clock clock) {
         this.commands = commands;
         this.events = events;
         this.commandRepository = commandRepository;
         this.failureRepository = failureRepository;
-        this.properties = properties;
         this.clock = clock;
         this.schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
         this.schemaConfig = SchemaValidatorsConfig.builder().formatAssertionsEnabled(true).build();
@@ -111,7 +108,7 @@ public class ContractCommandHandler {
         try {
             ContractCommandService.CommandResult result =
                     commands.execute(type, payload, root.path("producer").asText("unknown"));
-            remember(idempotencyKey, type, result.messageKey(), properties.topics().invoiceEvent(), result.resultPayload());
+            remember(idempotencyKey, type, result.messageKey(), result.resultTopic(), result.resultPayload());
         } catch (ContractRejectedException e) {
             // Answered, but deliberately not remembered. Idempotency exists so a repeat cannot create
             // a second invoice; a rejection created nothing, so re-running one risks nothing either.

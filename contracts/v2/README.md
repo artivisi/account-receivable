@@ -58,6 +58,69 @@ Sesudah nota kredit sebagian, `invoiceStatus` pada event bernilai `PARTIALLY_PAI
 uang yang masuk: status menyatakan sisa kewajiban, bukan kas yang diterima. Laporan penerimaan kas
 membaca pembayaran, bukan status tagihan.
 
+## Pembayaran di luar gateway: `payment.recorded`
+
+Uang yang tidak melewati Payment Gateway hanya diketahui aplikasi yang menerimanya: tunai di loket,
+transfer langsung ke rekening kampus, QRIS, dan kartu di mesin EDC. Sebelum perintah ini ada,
+tagihannya tetap terbuka selamanya, dan VA-nya tetap menagih jumlah yang sudah dibayar.
+
+`reference` adalah nomor bukti milik aplikasi pengirim: nomor kuitansi, nomor transaksi QRIS, atau
+nomor jurnal transfer. Nomor tersebut menjadi identitas pembayaran di AR pada ruang nama `RECORDED`,
+sehingga **boleh sama** dengan nomor jurnal bank. Keunikan dihitung per sumber, tidak secara global.
+Nomor bukti yang berulang dengan `idempotencyKey` berbeda ditolak `REFERENCE_DUPLICATE`: pengulangan
+perintah sudah dijawab dari penyimpanan idempotensi, sehingga nomor berulang dengan kunci baru
+berarti pernyataan berbeda tentang uang yang sama.
+
+`paidAt` menyatakan kapan uangnya diterima. Kuitansi yang dicatat tiga hari kemudian tetap masuk ke
+penerimaan kas pada hari uangnya diterima.
+
+VA-nya ikut disesuaikan, lewat jalur yang sama seperti nota kredit. Sisa tagihan nol: charge-nya
+dibatalkan (`charge.cancelled`). Masih ada sisa: nominal charge-nya diturunkan sampai sisa tersebut
+(`charge.repriced` dengan `reason: PAYMENT_RECORDED`). Tanpa langkah tersebut, tagihan yang sudah
+dilunasi di loket masih dibayar untuk kedua kalinya oleh pembayar yang menuruti VA-nya.
+
+Jawabannya adalah **`payment.received` di topic `payment-event-v2`** dengan `source: RECORDED`. Satu
+jenis event melayani semua jalur pembayaran, karena aplikasi hulu menaikkan status pembayarnya dari
+event tersebut saja. Jenis event kedua hanya akan dibaca aplikasi yang sempat menambahkannya.
+Aplikasi lain melewatkannya, dan pembayaran tanpa tindak lanjut adalah kegagalan yang hendak
+diakhiri perintah ini. Penolakan tetap `invoice.rejected` di `invoice-event-v2`, seperti pada semua perintah lain.
+
+Kelebihan bayar ditolak `AMOUNT_INVALID`. Jalur gateway menitipkan kelebihan bayar karena bank tidak
+dapat diminta mengirim lebih sedikit; di loket, angka yang melebihi utang adalah salah input yang
+diperbaiki di tempat.
+
+## Pembayaran yang ditarik kembali: `payment.reversed`
+
+AR sudah dapat membatalkan pembayaran sejak awal, tanpa pernah mengabarkannya. Akibatnya pembayar
+yang pembayarannya dibatalkan tetap terbaca lunas di aplikasi hulu, selamanya. Dua jalur sama-sama
+membutuhkan kabar ini: banknya membatalkan, atau keuangan membatalkan karena uangnya tercatat pada
+tagihan yang salah. Consumer tidak dapat menghitung sendiri kabar tersebut, karena status
+pembayarnya dinaikkan oleh `payment.received`, dan tidak ada apa pun di datanya sendiri yang
+membantahnya.
+
+`cumulativePaid`, `outstanding`, dan `invoiceStatus` adalah keadaan tagihan **sesudah** pembatalan,
+sehingga consumer menimpa nilai simpanannya. `amount` adalah nominal yang ditarik kembali. Seluruh
+nilai `invoiceStatus` diizinkan, termasuk `WRITTEN_OFF` dan `CANCELLED`: pembayaran dapat dibatalkan
+jauh setelah tagihannya ditutup, dan skema yang menolak keadaan tersebut justru akan menghilangkan
+kabarnya.
+
+## Pembayaran membawa `source` sejak revisi 4
+
+`payment.received` kini wajib membawa `source`, dengan nilai `GATEWAY` atau `RECORDED`. Field yang
+hanya dimiliki satu jalur **tidak ada** pada jalur lain, dan tidak pernah diisi nilai buatan:
+
+| `source` | Wajib | Tidak ada |
+|---|---|---|
+| `GATEWAY` | `vaNumber`, `bank` | — |
+| `RECORDED` | `channel` | `vaNumber` |
+
+**Yang perlu diperiksa sebelum AR versi ini dipasang.** Aplikasi hulu yang memvalidasi event masuk
+terhadap salinan skema sendiri perlu memperbarui salinannya lebih dahulu. Seluruh payload event
+memakai `additionalProperties: false`, sehingga field baru pada salinan lama menjadi penolakan, dan
+event pembayaran yang ditolak validator berarti pembayaran yang tidak pernah diterapkan. Hal yang
+sama berlaku untuk `payment.reversed`: jenis message yang belum dikenal adalah error di sisi
+consumer, dan tidak boleh dilewati.
+
 ## Nilai contoh
 
 Seluruh kode debitur, nomor tagihan, dan nomor VA dalam `examples/` adalah nilai rekaan yang

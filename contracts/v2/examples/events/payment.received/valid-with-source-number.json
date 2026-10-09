@@ -12,7 +12,8 @@
     "amount": "2166667.00",
     "cumulativePaid": "2166667.00",
     "outstanding": "4333333.00",
-    "bank": "bsi",
+    "bank": "demo",
+    "source": "GATEWAY",
     "reference": "202608271536320002",
     "paidAt": "2026-08-27T15:36:32+07:00",
     "invoiceStatus": "PARTIALLY_PAID"

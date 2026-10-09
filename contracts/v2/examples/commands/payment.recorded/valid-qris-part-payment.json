@@ -1,0 +1,16 @@
+{
+  "type": "payment.recorded",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a41",
+  "occurredAt": "2026-10-09T11:40:19+07:00",
+  "producer": "siakad-be",
+  "payload": {
+    "idempotencyKey": "siakad:qris:QR2026100900871",
+    "invoiceNumber": "2026082740999001",
+    "currency": "IDR",
+    "amount": "2166667.00",
+    "paidAt": "2026-10-09T11:39:51+07:00",
+    "channel": "QRIS",
+    "reference": "QR2026100900871",
+    "decisionReference": "SK-KERINGANAN-2026-0188"
+  }
+}

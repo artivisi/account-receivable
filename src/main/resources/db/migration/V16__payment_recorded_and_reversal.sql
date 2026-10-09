@@ -40,3 +40,18 @@ comment on column cash_application.source is
     'Namespace that issued payment_reference: GATEWAY (bank, through the gateway webhook) or RECORDED (an upstream application, through payment.recorded).';
 comment on column cash_application.reversal_reference is
     'Approval number the reversal rests on, when a person decided it upstream. Same meaning as decisionReference in the v2 contract.';
+
+-- 3. How a payment outside the gateway reached us.
+--
+-- Nullable because it is inapplicable, not unknown: a GATEWAY payment arrived through a VA and has
+-- no counter channel. A RECORDED payment must carry one — the service refuses it otherwise — so
+-- cash receipts stay separable by channel in the books, which is the whole reason finance asked.
+alter table cash_application add column payment_channel varchar(20);
+
+alter table cash_application
+    add constraint chk_cash_application_channel check (
+        (source = 'RECORDED' and payment_channel is not null)
+     or (source <> 'RECORDED' and payment_channel is null));
+
+comment on column cash_application.payment_channel is
+    'CASH, TRANSFER, QRIS or EDC for a RECORDED payment; null for a GATEWAY one, which arrived through a VA.';

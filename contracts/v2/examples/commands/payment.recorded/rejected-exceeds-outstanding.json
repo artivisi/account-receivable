@@ -1,0 +1,15 @@
+{
+  "type": "payment.recorded",
+  "eventId": "0198f3c2-6b1e-7a44-9c31-1f0b2d5e8a44",
+  "occurredAt": "2026-10-09T12:10:00+07:00",
+  "producer": "spmb",
+  "payload": {
+    "idempotencyKey": "spmb:kuitansi:KW-2026-004419",
+    "invoiceNumber": "2026082740999002",
+    "currency": "IDR",
+    "amount": "500000.00",
+    "paidAt": "2026-10-09T12:08:00+07:00",
+    "channel": "CASH",
+    "reference": "KW-2026-004419"
+  }
+}

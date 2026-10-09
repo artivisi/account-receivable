@@ -2,6 +2,7 @@ package com.artivisi.accountreceivable.service;
 
 import com.artivisi.accountreceivable.client.GatewayConsumerClient;
 import com.artivisi.accountreceivable.config.ArGatewayProperties;
+import com.artivisi.accountreceivable.contract.ContractEventService;
 import com.artivisi.accountreceivable.entity.CancellationStatus;
 import com.artivisi.accountreceivable.entity.Charge;
 import com.artivisi.accountreceivable.entity.ChargeCancellation;
@@ -23,9 +24,11 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Outbound outbox for cancelling gateway charges on write-off. {@link #enqueueForWriteOff} runs in
- * the write-off transaction; {@link #cancel} posts each cancellation in its own transaction with
- * backoff, marking the local charge CANCELLED on success. Terminal FAILED is surfaced, never dropped.
+ * Outbound outbox for retiring a gateway charge whose receivable has stopped being collectible —
+ * written off, cancelled, or settled by something other than the VA. {@link #enqueueForWriteOff}
+ * runs in the deciding transaction; {@link #cancel} posts each cancellation in its own transaction
+ * with backoff, marking the local charge CANCELLED on success. Terminal FAILED is surfaced, never
+ * dropped.
  */
 @Service
 public class ChargeCancellationService {
@@ -37,17 +40,20 @@ public class ChargeCancellationService {
     private final ChargeRepository chargeRepository;
     private final ChargeCancellationRepository cancellationRepository;
     private final GatewayConsumerClient gatewayClient;
+    private final ContractEventService contractEvents;
     private final ArGatewayProperties properties;
     private final Clock clock;
 
     public ChargeCancellationService(ChargeRepository chargeRepository,
                                      ChargeCancellationRepository cancellationRepository,
                                      GatewayConsumerClient gatewayClient,
+                                     ContractEventService contractEvents,
                                      ArGatewayProperties properties,
                                      Clock clock) {
         this.chargeRepository = chargeRepository;
         this.cancellationRepository = cancellationRepository;
         this.gatewayClient = gatewayClient;
+        this.contractEvents = contractEvents;
         this.properties = properties;
         this.clock = clock;
     }
@@ -111,11 +117,46 @@ public class ChargeCancellationService {
             row.getCharge().cancel(java.time.Instant.now(clock));
             row.setLastError(null);
             row.setLastResponseCode(null);
+            announce(row.getCharge());
         } catch (RestClientResponseException e) {
             recordFailure(row, e.getStatusCode().value(), e.getMessage());
         } catch (Exception e) {
             recordFailure(row, null, e.getMessage());
         }
+    }
+
+    /**
+     * Tell the upstream application that this VA has stopped collecting.
+     *
+     * <p>Only this side can. The cancellation was decided here — a write-off, a scholarship that
+     * closed the bill, a payment taken at a counter — so an upstream mirror has nothing in its own
+     * data that contradicts a live VA, and it keeps showing the payer a number that answers
+     * NOT_FOUND at the bank. The gateway does send its own CHARGE_CANCELLED webhook back, but by the
+     * time it arrives this charge is already CANCELLED locally and the mirror handler treats it as a
+     * repeat and stays silent, which is how the event came to be missing on every AR-decided path.
+     *
+     * <p>The reason is read from the receivable's status, exactly as the webhook mirror reads it, so
+     * the two paths cannot disagree. A status outside the three that can reach here is logged and
+     * left unannounced rather than labelled with a reason that would be a guess.
+     */
+    private void announce(Charge charge) {
+        Invoice receivable = charge.getInvoice() != null
+                ? charge.getInvoice()
+                : charge.getInstallment().getSchedule().getInvoice();
+        String reason = switch (receivable.getPaymentStatus()) {
+            case WRITTEN_OFF -> "INVOICE_WRITTEN_OFF";
+            case CANCELLED -> "INVOICE_CANCELLED";
+            case PAID -> "INVOICE_PAID";
+            case OPEN, PARTIALLY_PAID -> null;
+        };
+        if (reason == null) {
+            log.error("Charge {} (VA {}) cancelled at the gateway while receivable {} is still {};"
+                            + " no charge.cancelled announced because no reason in the contract fits",
+                    charge.getConsumerReference(), charge.getVaNumber(),
+                    receivable.getInvoiceNumber(), receivable.getPaymentStatus());
+            return;
+        }
+        contractEvents.chargeCancelled(charge, receivable, reason);
     }
 
     private void recordFailure(ChargeCancellation row, Integer responseCode, String error) {
