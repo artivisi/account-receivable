@@ -162,8 +162,28 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         return JSON.readTree(row.getPayload()).get("payload");
     }
 
+    /**
+     * The plan command with its legs rebased onto today. The published example carries fixed
+     * calendar dates, and {@code amountDueOn} collects every leg that has fallen due — so once the
+     * example's second date passes, the charge is worth two instalments and the scenario these
+     * tests describe no longer exists. Rebasing keeps "three legs, none of them due yet" true on
+     * whatever day the suite runs. The invoice's own dueDate follows the last leg, which
+     * InvoiceService requires.
+     */
+    private static String planCommand() throws IOException {
+        ObjectNode root = (ObjectNode) JSON.readTree(
+                fixture("commands/invoice.requested/valid-with-plan.json", null));
+        ObjectNode payload = (ObjectNode) root.get("payload");
+        JsonNode plan = payload.get("paymentPlan");
+        for (int i = 0; i < plan.size(); i++) {
+            ((ObjectNode) plan.get(i)).put("dueDate", LocalDate.now().plusDays(30L * (i + 1)).toString());
+        }
+        payload.put("dueDate", plan.get(plan.size() - 1).get("dueDate").asText());
+        return JSON.writeValueAsString(root);
+    }
+
     private String issuePlan() throws IOException {
-        String message = fixture("commands/invoice.requested/valid-with-plan.json", null);
+        String message = planCommand();
         int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
         handler.handle("invoice-command", message);
         List<ContractEventOutbox> events = eventsFor(DEBTOR, before);
@@ -195,7 +215,7 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void requestedWithPlan_issuesAndOpensCharge_andARepeatRepublishesTheSameEvent() throws IOException {
-        String message = fixture("commands/invoice.requested/valid-with-plan.json", null);
+        String message = planCommand();
         int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
 
         handler.handle("invoice-command", message);
