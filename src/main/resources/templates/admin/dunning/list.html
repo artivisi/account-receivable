@@ -12,7 +12,7 @@
     <div id="flash-msg" th:if="${msg}" class="rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
     <div id="flash-error" th:if="${error}" class="rounded-md bg-red-50 px-3 py-2 text-sm text-rose-700" th:text="${error}"></div>
 
-    <form id="dunning-form" class="card flex flex-wrap items-end gap-3 p-6" th:action="@{/admin/dunning}" method="post">
+    <form sec:authorize="hasAnyRole('ADMIN','OPERATOR')" id="dunning-form" class="card flex flex-wrap items-end gap-3 p-6" th:action="@{/admin/dunning}" method="post">
         <div>
             <label class="label" for="dunning-channel">Kanal</label>
             <select id="dunning-channel" class="input" name="channel">

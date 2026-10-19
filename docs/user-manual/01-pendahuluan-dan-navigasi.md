@@ -20,6 +20,7 @@ pemberitahuan "You have been signed out."
 |-------|-------|
 | `ADMIN` | seluruh menu, termasuk **Operators** (manajemen pengguna) |
 | `OPERATOR` | seluruh menu operasional kecuali manajemen pengguna |
+| `VIEWER` | baca saja: seluruh halaman dapat dibuka, tetapi tidak ada tombol aksi, formulir baru/ubah, atau unggah massal |
 
 ## Navigasi
 

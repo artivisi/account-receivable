@@ -45,7 +45,9 @@ The generated `app.css` IS committed so the build/runtime needs no Node/Tailwind
 ## Auth bootstrap
 
 `ar.admin.username` / `ar.admin.password` (required env config) seed an ADMIN user on first start
-if absent. Additional users are managed under `/admin/operators` (ADMIN only).
+if absent. Additional users are managed under `/admin/operators` (ADMIN only). A `VIEWER` reads
+every admin page and is refused every POST, the new/edit form pages and bulk upload, in
+`SecurityConfig`; the templates also hide those actions so a VIEWER is not offered them.
 
 ## UI tests & locators
 

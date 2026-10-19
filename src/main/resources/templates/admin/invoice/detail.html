@@ -98,7 +98,7 @@
                 </p>
             </div>
 
-            <div class="flex flex-wrap gap-2" th:if="${invoice.collectible()}">
+            <div sec:authorize="hasAnyRole('ADMIN','OPERATOR')" class="flex flex-wrap gap-2" th:if="${invoice.collectible()}">
                 <form method="post"
                       th:action="@{/admin/invoices/{id}/charge(id=${invoice.id})}">
                     <button id="btn-open-charge" class="btn-ghost" type="submit">Buka Charge</button>
@@ -165,7 +165,7 @@
                             <div class="flex flex-wrap items-center gap-3">
                                 <!-- Per cicilan, bukan per faktur: satu jadwal punya satu jatuh tempo
                                      per cicilan, jadi tanggal faktur tidak bisa mewakilinya. -->
-                                <form th:if="${i.collectible()}" method="post" class="flex items-center gap-1"
+                                <form sec:authorize="hasAnyRole('ADMIN','OPERATOR')" th:if="${i.collectible()}" method="post" class="flex items-center gap-1"
                                       th:action="@{/admin/invoices/{iid}/installments/{id}/due-date(iid=${invoice.id},id=${i.id})}">
                                     <input th:id="'input-installment-due-date-' + ${i.sequence}" name="dueDate"
                                            type="date" required th:value="${i.dueDate}"
@@ -180,7 +180,7 @@
                 </div>
             </div>
 
-            <div class="card p-6" th:if="${invoice.collectible()}">
+            <div sec:authorize="hasAnyRole('ADMIN','OPERATOR')" class="card p-6" th:if="${invoice.collectible()}">
                 <div class="mb-1 text-sm font-semibold text-slate-700">Nota Kredit</div>
                 <p class="mb-3 text-xs text-slate-500">
                     Untuk beasiswa, potongan, dan koreksi nilai. Sisa tagihan berkurang, nilai faktur tetap,

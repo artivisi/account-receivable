@@ -32,7 +32,7 @@ Isi formulir di bagian atas:
 |-------|------------|
 | Username | nama pengguna unik untuk login |
 | Display name | nama tampilan |
-| Role | `ADMIN` atau `OPERATOR` |
+| Role | `ADMIN`, `OPERATOR`, atau `VIEWER` (baca saja) |
 | Password | kata sandi awal |
 
 Klik **Create**. Pengguna baru muncul di tabel.

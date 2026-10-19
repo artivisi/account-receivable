@@ -15,7 +15,7 @@
         </div>
         <div class="flex items-center gap-3">
             <button id="btn-export-csv" type="button" class="btn-ghost">Ekspor CSV</button>
-            <a id="btn-new-invoice" th:href="@{/admin/invoices/new}" class="btn-primary">+ Faktur Baru</a>
+            <a sec:authorize="hasAnyRole('ADMIN','OPERATOR')" id="btn-new-invoice" th:href="@{/admin/invoices/new}" class="btn-primary">+ Faktur Baru</a>
         </div>
     </div>
 

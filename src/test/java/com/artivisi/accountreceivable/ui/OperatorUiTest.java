@@ -20,7 +20,7 @@ class OperatorUiTest extends PlaywrightTestBase {
         page.fill("#operator-username", username);
         page.fill("#operator-display-name", "Operator " + username);
         page.selectOption("#operator-role", "OPERATOR");
-        page.fill("#operator-password", "rahasia-" + username);
+        page.fill("#operator-password", "rahasia-panjang-" + username);
         page.click("#btn-create-operator");
 
         page.waitForURL("**/admin/operators");

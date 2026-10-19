@@ -16,7 +16,7 @@
         <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Faktur</h1>
         <div class="flex gap-2">
             <a id="btn-bulk-upload" th:href="@{/admin/bulk-uploads}" class="btn-ghost">Unggah Massal</a>
-            <a id="btn-new-invoice" th:href="@{/admin/invoices/new}" class="btn-primary">+ Faktur Baru</a>
+            <a sec:authorize="hasAnyRole('ADMIN','OPERATOR')" id="btn-new-invoice" th:href="@{/admin/invoices/new}" class="btn-primary">+ Faktur Baru</a>
         </div>
     </div>
     <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>

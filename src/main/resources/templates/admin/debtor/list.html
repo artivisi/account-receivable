@@ -6,7 +6,7 @@
 <main class="mx-auto max-w-7xl px-4 py-8">
     <div class="page-header mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 id="page-title" class="text-2xl font-semibold text-slate-900">Debitur</h1>
-        <a id="btn-new-debtor" th:href="@{/admin/debtors/new}" class="btn-primary">+ Debitur Baru</a>
+        <a sec:authorize="hasAnyRole('ADMIN','OPERATOR')" id="btn-new-debtor" th:href="@{/admin/debtors/new}" class="btn-primary">+ Debitur Baru</a>
     </div>
     <div id="flash-msg" th:if="${msg}" class="mb-4 rounded-md bg-accent-50 px-3 py-2 text-sm text-accent-700" th:text="${msg}"></div>
 
@@ -31,7 +31,7 @@
                     <td class="td"><span th:class="${d.status.name() == 'ACTIVE'} ? 'badge-ok' : 'badge-muted'" th:text="${d.status.name() == 'ACTIVE'} ? 'AKTIF' : 'NONAKTIF'"></span></td>
                     <td class="td whitespace-nowrap">
                         <a class="text-primary-700 hover:underline" th:id="'debtor-detail-link-' + ${d.code}" th:href="@{/admin/debtors/{id}(id=${d.id})}">Detail</a>
-                        <a class="ml-3 text-primary-700 hover:underline" th:id="'edit-debtor-' + ${d.code}" th:href="@{/admin/debtors/{id}/edit(id=${d.id})}">Ubah</a>
+                        <a sec:authorize="hasAnyRole('ADMIN','OPERATOR')" class="ml-3 text-primary-700 hover:underline" th:id="'edit-debtor-' + ${d.code}" th:href="@{/admin/debtors/{id}/edit(id=${d.id})}">Ubah</a>
                     </td>
                 </tr>
                 <tr th:if="${debtors.isEmpty()}"><td id="debtor-empty" class="td text-slate-400" colspan="6">Belum ada debitur.</td></tr>

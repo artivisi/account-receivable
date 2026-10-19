@@ -48,7 +48,7 @@
                          th:text="'Terdeteksi ' + ${#temporals.format(row.upstreamMissingAt, 'dd MMM yyyy HH:mm')}"></div>
                 </td>
                 <td class="td">
-                    <form method="post" class="flex items-center gap-1"
+                    <form sec:authorize="hasAnyRole('ADMIN','OPERATOR')" method="post" class="flex items-center gap-1"
                           th:action="@{/admin/cash-applications/{id}/upstream-cleared(id=${row.id})}">
                         <input th:id="'input-cleared-note-' + ${row.id}" name="note" required maxlength="255"
                                placeholder="Sudah dicatat di mana / oleh siapa"
