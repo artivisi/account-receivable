@@ -7,7 +7,8 @@ import com.artivisi.accountreceivable.exception.InvalidRequestException;
 import com.artivisi.accountreceivable.repository.ChargeRepository;
 import com.artivisi.accountreceivable.service.CollectionService;
 import com.artivisi.accountreceivable.service.SupersededChargeSweeper;
-import com.artivisi.accountreceivable.spi.VaNumberSupplier;
+import com.artivisi.accountreceivable.spi.VaKeySupplier;
+import com.artivisi.accountreceivable.spi.VaKeys;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -55,8 +56,8 @@ class CollectionVaReuseIntegrationTest extends AbstractIntegrationTest {
         /** Every bill for a debtor lands on the same VA number, forcing the supersede path. */
         @Bean
         @Primary
-        VaNumberSupplier reuseVaSupplier() {
-            return ctx -> "920-" + ctx.debtorCode();
+        VaKeySupplier reuseVaSupplier() {
+            return ctx -> new VaKeys(ctx.debtorCode(), "0");
         }
     }
 

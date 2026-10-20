@@ -28,7 +28,6 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.config.import=classpath:notification/template-example.yml",
         "ar.notification.payload-mapper=TEMPLATE",
         "AR_NOTIFICATION_BANK_NAME=Bank Contoh",
-        "AR_NOTIFICATION_VA_DISPLAY_PREFIX=8888001",
         "AR_NOTIFICATION_CONTACT_INFO=021-0000000",
         "AR_NOTIFICATION_CONTACT_INFO_FULL=<ul><li>Layanan Keuangan : 021-0000000</li></ul>"
 })

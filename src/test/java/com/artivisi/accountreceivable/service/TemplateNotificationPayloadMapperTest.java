@@ -37,7 +37,6 @@ class TemplateNotificationPayloadMapperTest {
     private static TemplateNotificationPayloadMapper exampleMapper() {
         return new TemplateNotificationPayloadMapper(bindExample(Map.of(
                 "AR_NOTIFICATION_BANK_NAME", "Bank Contoh",
-                "AR_NOTIFICATION_VA_DISPLAY_PREFIX", "8888001",
                 "AR_NOTIFICATION_CONTACT_INFO", "021-0000000",
                 "AR_NOTIFICATION_CONTACT_INFO_FULL", CONTACT_FULL)));
     }
@@ -65,6 +64,7 @@ class TemplateNotificationPayloadMapperTest {
         g.put("issueDate", "2026-01-01");
         g.put("dueDate", "2026-01-31");
         g.put("vaNumber", "011234567890");
+        g.put("interbankVaNumber", "8888001011234567890");
         g.put("escrowCode", "bank-contoh");
         g.put("email", "budi.santoso@example.com");
         g.put("phone", "081200000001");
@@ -162,7 +162,6 @@ class TemplateNotificationPayloadMapperTest {
     void anUnsetDeploymentValueFailsStartup() {
         assertThatThrownBy(() -> bindExample(Map.of(
                 "AR_NOTIFICATION_BANK_NAME", "Bank Contoh",
-                "AR_NOTIFICATION_VA_DISPLAY_PREFIX", "8888001",
                 "AR_NOTIFICATION_CONTACT_INFO", "021-0000000")))
                 .hasStackTraceContaining("unresolved placeholder: ${AR_NOTIFICATION_CONTACT_INFO_FULL}");
     }
@@ -171,7 +170,6 @@ class TemplateNotificationPayloadMapperTest {
     void aBlankDeploymentValueFailsStartup() {
         assertThatThrownBy(() -> bindExample(Map.of(
                 "AR_NOTIFICATION_BANK_NAME", "Bank Contoh",
-                "AR_NOTIFICATION_VA_DISPLAY_PREFIX", "8888001",
                 "AR_NOTIFICATION_CONTACT_INFO", " ",
                 "AR_NOTIFICATION_CONTACT_INFO_FULL", CONTACT_FULL)))
                 .hasStackTraceContaining("contactinfo is blank");

@@ -10,6 +10,10 @@ import org.springframework.validation.annotation.Validated;
  * {@code clientSecret} authenticates outbound charge calls and verifies inbound webhook signatures
  * (the gateway signs webhooks with the consumer secret). The retry/poll fields tune the outbound
  * charge-cancellation outbox.
+ *
+ * <p>No VA number layout here. The prefix, total length and segment widths are facts about the
+ * bank, they live on the gateway's escrow, and the gateway composes the number from the keys AR
+ * sends; see {@code VaKeySupplier}.
  */
 @Validated
 @ConfigurationProperties(prefix = "ar.gateway")
@@ -20,10 +24,6 @@ public record ArGatewayProperties(
         @NotBlank String escrowCode,
         @Min(1) int maxAttempts,
         @Min(0) long backoffBaseSeconds,
-        @Min(1) long pollIntervalMs,
-        // VA encoding — required only when using the built-in EncodedVaNumberSupplier.
-        String vaPrefix,
-        Integer vaDigitLength,
-        Integer vaInvoiceTypeDigits
+        @Min(1) long pollIntervalMs
 ) {
 }

@@ -284,13 +284,12 @@ Decided:
   gain-loss logic now.
 - **Licensing** — all-rights-reserved/proprietary placeholder header + `LICENSE` during
   development; final license settled before release (README's stance unchanged).
-- **VA number encoding** — built-in `EncodedVaNumberSupplier` (engine, pending):
-  `prefix + leftPad(invoiceTypeVaCode, N) + leftPad(debtorCode, M)` where N is
-  `ar.gateway.va-invoice-type-digits` (1 or 2) and M fills the remaining digits to
-  `ar.gateway.va-digit-length`. Invoice type → numeric code stored in `invoice_type_va_code`
-  mapping table (engine-managed CRUD). `VaAllocationContext(escrowCode, consumerReference,
-  debtorCode, invoiceTypeCode)` passed from `CollectionService` to the supplier. SPI
-  (`VaNumberSupplier`) kept as override escape hatch with `@ConditionalOnMissingBean`.
+- **VA number encoding** — superseded 2026-10 (issue #1): the gateway allocates the number. AR
+  sends `payerKey` (debtor code) + `slotKey` (the type's `invoice_type_va_code`) from
+  `InvoiceTypeVaKeySupplier`, behind the `VaKeySupplier` SPI (`@ConditionalOnMissingBean`), and
+  stores the `vaNumber` + `interbankVaNumber` the gateway returns. The layout config
+  (`ar.gateway.va-*`, `ar.contract.interbank-va-prefix`) is gone; the DATED_TYPE_CODE bill number's
+  width is `ar.invoice.type-code-digits`.
 - **VA number reuse** — VA numbers are reusable once inactive (PAID/CANCELLED/EXPIRED).
   Uniqueness enforced only among ACTIVE VAs. Requires payment-gateway change: drop
   `uq_va_escrow_number` table constraint; add partial unique index

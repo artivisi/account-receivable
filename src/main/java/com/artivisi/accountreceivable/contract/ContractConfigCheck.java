@@ -20,7 +20,6 @@ public class ContractConfigCheck {
             return;
         }
         require("ar.contract.producer-name", properties.producerName());
-        require("ar.contract.interbank-va-prefix", properties.interbankVaPrefix());
         ArContractProperties.Topics t = properties.topics();
         if (t == null) {
             throw new IllegalStateException("ar.contract.topics is required unless ar.contract.mode=OFF");

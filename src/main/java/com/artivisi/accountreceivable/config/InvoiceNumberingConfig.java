@@ -18,14 +18,12 @@ public class InvoiceNumberingConfig {
 
     @Bean
     public InvoiceNumberStrategy invoiceNumberStrategy(ArInvoiceProperties properties,
-                                                       ArGatewayProperties gatewayProperties,
                                                        RunningNumberService runningNumbers,
                                                        InvoiceTypeVaCodeRepository vaCodes) {
         return switch (properties.numberStrategy()) {
             case SEQUENTIAL -> new SequentialInvoiceNumberStrategy(runningNumbers, properties);
             case DATED_TYPE_CODE ->
-                    new DatedTypeCodeInvoiceNumberStrategy(runningNumbers, vaCodes, properties,
-                            gatewayProperties);
+                    new DatedTypeCodeInvoiceNumberStrategy(runningNumbers, vaCodes, properties);
         };
     }
 }

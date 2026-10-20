@@ -52,13 +52,17 @@ AR is a **Consumer** of the gateway (it holds a client id/secret + a webhook end
 - To collect: open a `Charge` via the gateway Consumer API — one **CLOSED** charge per invoice
   (single-payment) or one **CLOSED** charge per installment, so the webhook maps back to its target
   by `consumerReference` (= the invoice/installment id) with no amount-guessing.
-- **AR never computes VA numbers** (decided 2026-09-19, issue #1 — until it lands,
-  `EncodedVaNumberSupplier` still does). Prefix, digit length, segment widths and the interbank
-  prefix are bank facts that live on the gateway's escrow; copying them into AR config is what
-  made AR single-bank. AR sends bank-agnostic inputs — `payerKey` = debtor code, `slotKey` = the
-  invoice type's `vaCode` (the `invoice_type_va_code` mapping stays here, because the gateway must
-  not learn AR's vocabulary) — and stores the `vaNumber` + `interbankVaNumber` the gateway returns.
-  Anything that needs "the number" before the gateway call keys on debtor + `vaCode` instead.
+- **AR never computes VA numbers** (decided 2026-09-19, issue #1). Prefix, digit length, segment
+  widths and the interbank prefix are bank facts that live on the gateway's escrow; copying them
+  into AR config is what made AR single-bank. AR sends bank-agnostic inputs — `payerKey` = debtor
+  code, `slotKey` = the invoice type's `vaCode` (the `invoice_type_va_code` mapping stays here,
+  because the gateway must not learn AR's vocabulary) — and stores the `vaNumber` +
+  `interbankVaNumber` the gateway returns, with the keys, on the `charge` row. Anything that needs
+  "the number" before the gateway call asks the keys instead
+  (`findByPayerKeyAndSlotKeyAndStatusIn`). `VaKeySupplier` is the override point;
+  `InvoiceTypeVaKeySupplier` is the default. Gateway refusals are read by `code`, never by wording
+  (`GatewayProblem`): `KEY_UNENCODABLE` on `payerKey` becomes `DEBTOR_CODE_UNENCODABLE` for the
+  sender; anything else is ours and lands in `contract_failure`.
 - Gateway charge types `INSTALLMENT` (accumulates to a target) / `OPEN` (deposits) are
   reserved for later deposit-style flows; v1 uses `CLOSED` only. Pay-via-any-bank is the gateway's
   concern.
@@ -69,9 +73,9 @@ AR is a **Consumer** of the gateway (it holds a client id/secret + a webhook end
   reference constraint is caught and returns the existing application (200), not 500 — the payment
   still applies exactly once (the constraint guarantees it).
 - **VA-number reuse / supersede.** A VA number points to at most one payable bill. If a new charge
-  targets a number the gateway still holds active (409), AR treats the new bill as superseding the
-  old: it cancels the prior still-collectible charge(s) on that number, then creates the new CLOSED
-  charge. This supports upstreams that reuse one VA number across successive single bills (a legacy
+  targets a number the gateway still holds active (`409 VA_NUMBER_BUSY`), AR treats the new bill as
+  superseding the old: it cancels the charge the refusal names (`heldByConsumerReference`), then
+  creates the new CLOSED charge. A number held by another consumer is never superseded. This supports upstreams that reuse one VA number across successive single bills (a legacy
   way of doing installments, with no installment model). AR's own installment flow uses real
   `INSTALLMENT` semantics (one charge, many payments) and does not reuse numbers, so the path is inert.
 - `consumerReference` on the gateway `Charge` carries this app's invoice/installment id for matching.

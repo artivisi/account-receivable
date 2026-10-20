@@ -41,6 +41,9 @@ ar:
     # SEQUENTIAL (prefix + running number) or DATED_TYPE_CODE (yyyyMMdd + type VA code + the day's
     # sequence, for a deployment whose bill numbers are already that shape). Required; no default.
     number-strategy: ${AR_INVOICE_NUMBER_STRATEGY}
+    # Width of the type's VA code inside a DATED_TYPE_CODE bill number. Required for that strategy
+    # only; the bill-number format is AR's own, so it is set here rather than read off the bank.
+    type-code-digits: ${AR_INVOICE_TYPE_CODE_DIGITS:}
   gateway:
     # Payment-gateway consumer config. All required; missing values fail startup.
     # client-secret authenticates outbound calls and verifies inbound webhook signatures.
@@ -87,8 +90,6 @@ ar:
     max-attempts: ${AR_CONTRACT_MAX_ATTEMPTS}
     backoff-base-seconds: ${AR_CONTRACT_BACKOFF_BASE_SECONDS}
     poll-interval-ms: ${AR_CONTRACT_POLL_INTERVAL_MS}
-    # Turns the bank's VA number into the interbank one (bank code + biller id); per deployment.
-    interbank-va-prefix: ${AR_CONTRACT_INTERBANK_VA_PREFIX:}
 
 management:
   endpoints:

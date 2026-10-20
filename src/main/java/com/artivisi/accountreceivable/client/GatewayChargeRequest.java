@@ -11,6 +11,9 @@ import java.util.List;
  * read time and retires the VA number once it passes, so omitting it leaves the number collectible
  * forever — a divergence from every bank adapter, which all derive expiry from a date they were
  * given.
+ *
+ * <p>No VA number. The gateway allocates one per account, in that escrow's layout, from
+ * {@code payerKey} and {@code slotKey}; an account names only its escrow.
  */
 public record GatewayChargeRequest(
         String consumerReference,
@@ -20,8 +23,10 @@ public record GatewayChargeRequest(
         Instant expiresAt,
         String billNumber,
         String description,
-        List<Account> accounts
+        List<Account> accounts,
+        String payerKey,
+        String slotKey
 ) {
-    public record Account(String escrowCode, String vaNumber) {
+    public record Account(String escrowCode) {
     }
 }

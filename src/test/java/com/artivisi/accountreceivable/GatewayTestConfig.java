@@ -1,13 +1,13 @@
 package com.artivisi.accountreceivable;
 
-import com.artivisi.accountreceivable.spi.VaAllocationContext;
-import com.artivisi.accountreceivable.spi.VaNumberSupplier;
+import com.artivisi.accountreceivable.spi.VaKeySupplier;
+import com.artivisi.accountreceivable.spi.VaKeys;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
 /**
- * Test-only beans. The VA-number scheme is a deployment concern the engine does not ship. The
+ * Test-only beans. Which keys a deployment allocates from is its own concern. The
  * notification publisher is faked so tests capture published requests instead of hitting a broker;
  * the outbox-backed EMAIL {@code NotificationSender} comes from production {@code NotificationSenderConfig},
  * and SMS stays unregistered (sms-enabled=false) so a run requesting SMS exercises the fail-loud path.
@@ -16,13 +16,14 @@ import org.springframework.context.annotation.Primary;
 public class GatewayTestConfig {
 
     /**
-     * Numeric, like every real one: the published contract types {@code vaNumber} as digits only, so a
-     * lettered stub number would let an event that no upstream validator accepts pass our tests.
+     * One slot per receivable, so every receivable gets its own number and no test collides on one by
+     * accident; the tests that exercise number reuse supply a constant slot instead. Without this,
+     * every test invoice type would need a VA code mapping before it could be collected.
      */
     @Bean
-    public VaNumberSupplier vaNumberSupplier() {
-        return (ctx) -> "8990" + String.format("%011d",
-                Math.abs((long) (ctx.escrowCode() + ":" + ctx.consumerReference()).hashCode()));
+    public VaKeySupplier vaKeySupplier() {
+        return ctx -> new VaKeys(ctx.debtorCode(),
+                String.valueOf(Math.abs((long) ctx.consumerReference().hashCode())));
     }
 
     @Bean

@@ -71,6 +71,11 @@ public interface ChargeRepository extends JpaRepository<Charge, String> {
             String vaNumber, java.util.Collection<com.artivisi.accountreceivable.entity.ChargeStatus> statuses);
 
 
+    /** Charges allocated from the same keys — at most one of them may still be collecting. */
+    java.util.List<Charge> findByPayerKeyAndSlotKeyAndStatusIn(
+            String payerKey, String slotKey,
+            java.util.Collection<com.artivisi.accountreceivable.entity.ChargeStatus> statuses);
+
     /** Charges opened against one invoice, in any state. */
     java.util.List<Charge> findByInvoiceId(String invoiceId);
 

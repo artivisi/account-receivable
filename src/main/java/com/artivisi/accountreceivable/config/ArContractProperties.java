@@ -22,9 +22,7 @@ public record ArContractProperties(
         @Min(1) int maxInstallments,
         @Min(1) int maxAttempts,
         @Min(0) long backoffBaseSeconds,
-        @Min(1) long pollIntervalMs,
-        /** Prefix that turns the bank's VA number into the interbank one; deployment-specific. */
-        String interbankVaPrefix
+        @Min(1) long pollIntervalMs
 ) {
     public record Topics(String invoiceCommand, String debtorCommand, String invoiceEvent, String paymentEvent) {
     }

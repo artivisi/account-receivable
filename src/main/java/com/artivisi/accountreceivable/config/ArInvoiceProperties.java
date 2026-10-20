@@ -11,7 +11,8 @@ import org.springframework.validation.annotation.Validated;
  * <p>{@code numberStrategy} picks the format. {@code SEQUENTIAL} is the product default and uses
  * {@code numberPrefix}; {@code DATED_TYPE_CODE} renders the issue date, the invoice type's VA code
  * and the day's sequence, and ignores the prefix — so the prefix is required only for the strategy
- * that reads it, rather than demanded of every deployment for the sake of one.
+ * that reads it, rather than demanded of every deployment for the sake of one. {@code typeCodeDigits}
+ * is the same: the width {@code DATED_TYPE_CODE} renders the type code in, and nothing else reads it.
  */
 @Validated
 @ConfigurationProperties(prefix = "ar.invoice")
@@ -19,7 +20,8 @@ public record ArInvoiceProperties(
         String numberPrefix,
         @NotBlank String creditNotePrefix,
         @Min(1) int numberPadLength,
-        Strategy numberStrategy
+        Strategy numberStrategy,
+        Integer typeCodeDigits
 ) {
 
     public enum Strategy {
@@ -39,6 +41,10 @@ public record ArInvoiceProperties(
         if (numberStrategy == Strategy.SEQUENTIAL && (numberPrefix == null || numberPrefix.isBlank())) {
             throw new IllegalArgumentException(
                     "ar.invoice.number-prefix is required when number-strategy is SEQUENTIAL");
+        }
+        if (numberStrategy == Strategy.DATED_TYPE_CODE && (typeCodeDigits == null || typeCodeDigits < 1)) {
+            throw new IllegalArgumentException(
+                    "ar.invoice.type-code-digits is required when number-strategy is DATED_TYPE_CODE");
         }
     }
 }

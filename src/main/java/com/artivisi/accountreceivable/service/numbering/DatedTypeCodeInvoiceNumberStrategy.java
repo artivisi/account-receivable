@@ -1,6 +1,5 @@
 package com.artivisi.accountreceivable.service.numbering;
 
-import com.artivisi.accountreceivable.config.ArGatewayProperties;
 import com.artivisi.accountreceivable.config.ArInvoiceProperties;
 import com.artivisi.accountreceivable.entity.InvoiceType;
 import com.artivisi.accountreceivable.exception.InvalidRequestException;
@@ -41,15 +40,14 @@ public class DatedTypeCodeInvoiceNumberStrategy implements InvoiceNumberStrategy
 
     public DatedTypeCodeInvoiceNumberStrategy(RunningNumberService runningNumbers,
                                               InvoiceTypeVaCodeRepository vaCodes,
-                                              ArInvoiceProperties properties,
-                                              ArGatewayProperties gatewayProperties) {
+                                              ArInvoiceProperties properties) {
         this.runningNumbers = runningNumbers;
         this.vaCodes = vaCodes;
         this.properties = properties;
-        // The same width the VA number gives the same code. Taking it from one place is what stops
-        // the two from drifting: a code stored as "3" renders as "03" in both, and every consumer
-        // that reads the type by position keeps working.
-        this.typeDigits = gatewayProperties.vaInvoiceTypeDigits();
+        // Its own setting. It used to be read off the VA number's layout, which made a bank fact
+        // decide the shape of AR's bill numbers; the layout lives on the gateway's escrow now, and
+        // a deployment that changes bank must not find its bill numbers changing width.
+        this.typeDigits = properties.typeCodeDigits();
     }
 
     private static String leftPad(String value, int width) {

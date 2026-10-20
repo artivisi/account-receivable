@@ -87,6 +87,19 @@ public abstract class AbstractIntegrationTest {
             java.util.regex.Pattern.compile("\"consumerReference\"\\s*:\\s*\"([^\"]+)\"");
     private static final java.util.regex.Pattern VA_PATTERN =
             java.util.regex.Pattern.compile("\"vaNumber\"\\s*:\\s*\"([^\"]+)\"");
+    private static final java.util.regex.Pattern PAYER_KEY_PATTERN =
+            java.util.regex.Pattern.compile("\"payerKey\"\\s*:\\s*\"([^\"]+)\"");
+    private static final java.util.regex.Pattern SLOT_KEY_PATTERN =
+            java.util.regex.Pattern.compile("\"slotKey\"\\s*:\\s*\"([^\"]+)\"");
+    private static final java.util.regex.Pattern ESCROW_PATTERN =
+            java.util.regex.Pattern.compile("\"escrowCode\"\\s*:\\s*\"([^\"]+)\"");
+    /** What the stub prefixes to a number to form the interbank one, standing in for the escrow's. */
+    protected static final String STUB_INTERBANK_PREFIX = "8888001";
+    // The number each charge was allocated, kept after its VA is freed: an idempotent repeat of a
+    // cancelled charge still reports the number it had, as the real gateway does.
+    private static final java.util.Map<String, String> STUB_CHARGE_NUMBER = new java.util.concurrent.ConcurrentHashMap<>();
+    // Payer keys the stub refuses as KEY_UNENCODABLE, standing in for an escrow layout too narrow for them.
+    private static final java.util.Set<String> STUB_UNENCODABLE_PAYER_KEYS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final java.util.regex.Pattern BILL_PATTERN =
             java.util.regex.Pattern.compile("\"billNumber\"\\s*:\\s*\"([^\"]+)\"");
     private static final java.util.regex.Pattern EXPIRES_PATTERN =
@@ -134,31 +147,48 @@ public abstract class AbstractIntegrationTest {
             java.util.regex.Matcher rm = REF_PATTERN.matcher(body);
             String reference = rm.find() ? rm.group(1) : null;
             String known = reference == null ? null : STUB_CHARGE_BY_REF.get(reference);
+            String escrow = firstMatch(ESCROW_PATTERN, body);
             if (known != null) {
                 // Idempotent hit: the charge this reference already names, in whatever state it is.
-                respond(exchange, 201, "{\"id\":\"" + known + "\",\"status\":\""
-                        + STUB_CHARGE_STATUS.getOrDefault(known, "ACTIVE") + "\"}");
+                respond(exchange, 201, chargeJson(known, STUB_CHARGE_STATUS.getOrDefault(known, "ACTIVE"),
+                        escrow, STUB_CHARGE_NUMBER.get(known)));
                 return;
             }
-            String vaNumber = extractVaNumber(body);
+            // The gateway allocates the number; a consumer that still sends one, or omits the keys,
+            // is on the old protocol and the real gateway refuses it.
+            String payerKey = firstMatch(PAYER_KEY_PATTERN, body);
+            String slotKey = firstMatch(SLOT_KEY_PATTERN, body);
+            if (extractVaNumber(body) != null || payerKey == null || slotKey == null || escrow == null) {
+                respond(exchange, 400, "{\"status\":400,\"detail\":\"stub: expected payerKey, slotKey and"
+                        + " accounts[].escrowCode with no vaNumber\"}");
+                return;
+            }
+            if (STUB_UNENCODABLE_PAYER_KEYS.contains(payerKey)) {
+                respond(exchange, 400, "{\"status\":400,\"title\":\"Key unencodable\",\"code\":\"KEY_UNENCODABLE\","
+                        + "\"field\":\"payerKey\",\"escrowCode\":\"" + escrow + "\",\"detail\":\"payerKey '"
+                        + payerKey + "' does not fit escrow " + escrow + "\"}");
+                return;
+            }
+            String vaNumber = allocateStubNumber(payerKey, slotKey);
             java.util.regex.Matcher bm = BILL_PATTERN.matcher(body);
             lastChargeBillNumber = bm.find() ? bm.group(1) : null;
             java.util.regex.Matcher em = EXPIRES_PATTERN.matcher(body);
             lastChargeExpiresAt = em.find() ? em.group(1) : null;
-            if (vaNumber != null && !STUB_ACTIVE_VA.add(vaNumber)) {
-                respond(exchange, 409, "{\"detail\":\"vaNumber already active for escrow demo: "
-                        + vaNumber + "\",\"status\":409,\"title\":\"Conflict\"}");
+            if (!STUB_ACTIVE_VA.add(vaNumber)) {
+                respond(exchange, 409, "{\"status\":409,\"title\":\"VA number busy\",\"code\":\"VA_NUMBER_BUSY\","
+                        + "\"escrowCode\":\"" + escrow + "\",\"vaNumber\":\"" + vaNumber + "\","
+                        + "\"heldByConsumerReference\":\"" + holderOf(vaNumber) + "\","
+                        + "\"detail\":\"vaNumber already active for escrow " + escrow + ": " + vaNumber + "\"}");
                 return;
             }
             String id = "gw-" + CHARGE_SEQ.incrementAndGet();
-            if (vaNumber != null) {
-                STUB_CHARGE_VA.put(id, vaNumber);
-            }
+            STUB_CHARGE_VA.put(id, vaNumber);
+            STUB_CHARGE_NUMBER.put(id, vaNumber);
             if (reference != null) {
                 STUB_CHARGE_BY_REF.put(reference, id);
             }
             STUB_CHARGE_STATUS.put(id, "ACTIVE");
-            respond(exchange, 201, "{\"id\":\"" + id + "\",\"status\":\"ACTIVE\"}");
+            respond(exchange, 201, chargeJson(id, "ACTIVE", escrow, vaNumber));
         });
         GATEWAY_STUB.start();
     }
@@ -166,6 +196,41 @@ public abstract class AbstractIntegrationTest {
     private static String extractVaNumber(String body) {
         java.util.regex.Matcher m = VA_PATTERN.matcher(body);
         return m.find() ? m.group(1) : null;
+    }
+
+    private static String firstMatch(java.util.regex.Pattern pattern, String body) {
+        java.util.regex.Matcher m = pattern.matcher(body);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * Deterministic in the keys, as the real allocator is: the same payer and slot always get the
+     * same number. Numeric, like every real one: the published contract types {@code vaNumber} as
+     * digits only, so a lettered stub number would let an event no upstream validator accepts pass.
+     */
+    private static String allocateStubNumber(String payerKey, String slotKey) {
+        return "8990" + String.format("%011d", Math.abs((long) (payerKey + ":" + slotKey).hashCode()));
+    }
+
+    /** The reference of the charge holding {@code vaNumber}, which the real 409 names. */
+    private static String holderOf(String vaNumber) {
+        String holderId = STUB_CHARGE_VA.entrySet().stream()
+                .filter(e -> e.getValue().equals(vaNumber)).map(java.util.Map.Entry::getKey)
+                .findFirst().orElseThrow(() -> new IllegalStateException("stub: no charge holds " + vaNumber));
+        return STUB_CHARGE_BY_REF.entrySet().stream()
+                .filter(e -> e.getValue().equals(holderId)).map(java.util.Map.Entry::getKey)
+                .findFirst().orElseThrow(() -> new IllegalStateException("stub: charge " + holderId + " has no reference"));
+    }
+
+    private static String chargeJson(String id, String status, String escrow, String vaNumber) {
+        return "{\"id\":\"" + id + "\",\"status\":\"" + status + "\",\"accounts\":[{\"escrowCode\":\"" + escrow
+                + "\",\"vaNumber\":\"" + vaNumber + "\",\"interbankVaNumber\":\"" + STUB_INTERBANK_PREFIX + vaNumber
+                + "\",\"status\":\"" + status + "\"}]}";
+    }
+
+    /** Make the stub refuse this payer key as one the escrow's layout cannot hold. */
+    protected static void refuseGatewayPayerKey(String payerKey) {
+        STUB_UNENCODABLE_PAYER_KEYS.add(payerKey);
     }
 
     @LocalServerPort
@@ -212,7 +277,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("ar.contract.max-attempts", () -> "3");
         registry.add("ar.contract.backoff-base-seconds", () -> "0");
         registry.add("ar.contract.poll-interval-ms", () -> "3600000");
-        registry.add("ar.contract.interbank-va-prefix", () -> "8888001");
     }
 
     @BeforeEach
@@ -223,6 +287,8 @@ public abstract class AbstractIntegrationTest {
         STUB_CHARGE_VA.clear();
         STUB_CHARGE_BY_REF.clear();
         STUB_CHARGE_STATUS.clear();
+        STUB_CHARGE_NUMBER.clear();
+        STUB_UNENCODABLE_PAYER_KEYS.clear();
     }
 
     /**

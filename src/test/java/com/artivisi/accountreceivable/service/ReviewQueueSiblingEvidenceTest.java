@@ -3,7 +3,8 @@ package com.artivisi.accountreceivable.service;
 import com.artivisi.accountreceivable.AbstractIntegrationTest;
 import com.artivisi.accountreceivable.dto.DueDateOutcome;
 import com.artivisi.accountreceivable.dto.ReviewQueueItem;
-import com.artivisi.accountreceivable.spi.VaNumberSupplier;
+import com.artivisi.accountreceivable.spi.VaKeySupplier;
+import com.artivisi.accountreceivable.spi.VaKeys;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -45,8 +46,9 @@ class ReviewQueueSiblingEvidenceTest extends AbstractIntegrationTest {
     static class SameVaPerDebtor {
         @Bean
         @Primary
-        VaNumberSupplier reuseVaSupplier() {
-            return ctx -> "930-" + ctx.debtorCode();
+        VaKeySupplier reuseVaSupplier() {
+            // One slot for every bill, so a debtor's bills all compete for one number.
+            return ctx -> new VaKeys(ctx.debtorCode(), "0");
         }
     }
 

@@ -50,7 +50,23 @@ public class Charge extends BaseEntity {
 
     private String escrowCode;
 
+    /** As the gateway allocated it. AR never composes this. */
     private String vaNumber;
+
+    /**
+     * The form a payer uses from another bank, as the gateway reported it when the charge opened.
+     * A charge opened before the gateway allocated numbers carries what its deployment backfilled.
+     */
+    private String interbankVaNumber;
+
+    /**
+     * The keys the number was allocated from. Two live charges with the same pair are two invoices
+     * competing for one number, which is how a sibling still collecting is recognised before the
+     * gateway is asked.
+     */
+    private String payerKey;
+
+    private String slotKey;
 
     private Instant expiresAt;
 

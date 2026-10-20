@@ -317,6 +317,25 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(failures.count()).as("a sender's mistake is a rejection, not a failure").isZero();
     }
 
+    /**
+     * The gateway, not AR, now decides that a debtor code does not fit the number space. Its coded
+     * refusal has to come back to the sender as a rejection: answered as an internal failure, the
+     * command would get no answer at all, which is how three of SPMB's commands vanished on
+     * 2026-09-29.
+     */
+    @Test
+    void aDebtorCodeTheGatewayCannotEncode_isRejected_notLeftUnanswered() throws IOException {
+        refuseGatewayPayerKey(DEBTOR);
+        String message = fixture("commands/invoice.requested/valid-single-payment.json", null);
+        int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", message);
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, before);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.get(0)).get("code").asText()).isEqualTo("DEBTOR_CODE_UNENCODABLE");
+    }
+
     @Test
     void unknownDebtor_isRejected_andTheSameCommandIsAnsweredAfreshNotFromTheStore() throws IOException {
         String message = fixture("commands/invoice.requested/rejected-unknown-debtor.json", null);

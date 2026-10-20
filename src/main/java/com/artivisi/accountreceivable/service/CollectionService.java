@@ -3,6 +3,7 @@ package com.artivisi.accountreceivable.service;
 import com.artivisi.accountreceivable.client.GatewayChargeRequest;
 import com.artivisi.accountreceivable.client.GatewayChargeResponse;
 import com.artivisi.accountreceivable.client.GatewayConsumerClient;
+import com.artivisi.accountreceivable.client.GatewayProblem;
 import com.artivisi.accountreceivable.config.ArGatewayProperties;
 import com.artivisi.accountreceivable.config.ArNotificationProperties;
 import com.artivisi.accountreceivable.service.notification.NotificationPayloadMapper;
@@ -39,7 +40,8 @@ import com.artivisi.accountreceivable.repository.ChargeRepository;
 import com.artivisi.accountreceivable.repository.InstallmentRepository;
 import com.artivisi.accountreceivable.repository.InvoiceRepository;
 import com.artivisi.accountreceivable.spi.VaAllocationContext;
-import com.artivisi.accountreceivable.spi.VaNumberSupplier;
+import com.artivisi.accountreceivable.spi.VaKeySupplier;
+import com.artivisi.accountreceivable.spi.VaKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -83,7 +85,7 @@ public class CollectionService {
     private final CreditNoteService creditNoteService;
     private final ChargeCancellationService chargeCancellationService;
     private final GatewayConsumerClient gatewayClient;
-    private final VaNumberSupplier vaNumberSupplier;
+    private final VaKeySupplier vaKeySupplier;
     private final NotificationService notificationService;
     private final ArGatewayProperties gatewayProperties;
     private final ArNotificationProperties notificationProperties;
@@ -100,7 +102,7 @@ public class CollectionService {
                              CreditNoteService creditNoteService,
                              ChargeCancellationService chargeCancellationService,
                              GatewayConsumerClient gatewayClient,
-                             VaNumberSupplier vaNumberSupplier,
+                             VaKeySupplier vaKeySupplier,
                              NotificationService notificationService,
                              ArGatewayProperties gatewayProperties,
                              ArNotificationProperties notificationProperties,
@@ -115,7 +117,7 @@ public class CollectionService {
         this.creditNoteService = creditNoteService;
         this.chargeCancellationService = chargeCancellationService;
         this.gatewayClient = gatewayClient;
-        this.vaNumberSupplier = vaNumberSupplier;
+        this.vaKeySupplier = vaKeySupplier;
         this.notificationService = notificationService;
         this.gatewayProperties = gatewayProperties;
         this.notificationProperties = notificationProperties;
@@ -185,7 +187,7 @@ public class CollectionService {
     /**
      * Refuse to open a charge on a VA number a different invoice is still collecting on.
      *
-     * <p>The number is {@code type + debtor}, so every invoice of one type for one payer resolves to
+     * <p>Every invoice of one type for one payer is allocated from the same keys, so it resolves to
      * the same number — which is exactly the shape a campus app produces when it issues each
      * instalment as its own invoice up front and collects them one at a time. Opening the second one
      * looks harmless: this invoice has no charge of its own, so nothing local objects. But the
@@ -193,20 +195,23 @@ public class CollectionService {
      * payer is in the middle of paying stops being payable, and the first anyone knows is a failed
      * payment at the ATM.
      *
+     * <p>Asked of the keys, not the number. AR no longer knows the number until the gateway has
+     * allocated it, and the question was never about a bank's digits anyway: it is whether another
+     * invoice of this debtor and type is still collecting.
+     *
      * <p>Reopening within one invoice is untouched — rollover and the reopen after a spent
      * generation both reuse the number deliberately, and both are the same invoice.
      */
     private void assertNumberNotHeldBySibling(Invoice invoice) {
-        String vaNumber = vaNumberSupplier.allocate(new VaAllocationContext(
-                gatewayProperties.escrowCode(), invoice.getId(),
-                invoice.getDebtor().getCode(), invoice.getInvoiceType().getCode()));
-        for (Charge held : chargeRepository.findByVaNumberAndStatusIn(
-                vaNumber, List.of(ChargeStatus.ACTIVE, ChargeStatus.PARTIALLY_PAID))) {
+        VaKeys keys = vaKeySupplier.keys(new VaAllocationContext(
+                invoice.getId(), invoice.getDebtor().getCode(), invoice.getInvoiceType().getCode()));
+        for (Charge held : chargeRepository.findByPayerKeyAndSlotKeyAndStatusIn(
+                keys.payerKey(), keys.slotKey(), List.of(ChargeStatus.ACTIVE, ChargeStatus.PARTIALLY_PAID))) {
             Invoice holder = held.getInvoice() != null ? held.getInvoice()
                     : (held.getInstallment() != null ? held.getInstallment().getSchedule().getInvoice() : null);
             if (holder != null && !holder.getId().equals(invoice.getId())) {
                 throw new InvalidRequestException("VA_NUMBER_BUSY",
-                        "VA " + vaNumber + " is still collecting invoice " + holder.getInvoiceNumber()
+                        "VA " + held.getVaNumber() + " is still collecting invoice " + holder.getInvoiceNumber()
                                 + "; that invoice must be paid or cancelled before "
                                 + invoice.getInvoiceNumber() + " can be collected on the same number");
             }
@@ -516,8 +521,7 @@ public class CollectionService {
         int firstGeneration = generations.size() + 1;
 
         Invoice receivable = invoice != null ? invoice : installment.getSchedule().getInvoice();
-        String vaNumber = vaNumberSupplier.allocate(new VaAllocationContext(
-                gatewayProperties.escrowCode(),
+        VaKeys keys = vaKeySupplier.keys(new VaAllocationContext(
                 targetReference,
                 receivable.getDebtor().getCode(),
                 receivable.getInvoiceType().getCode()));
@@ -533,10 +537,12 @@ public class CollectionService {
         // inquiry response carries. Without it the bank shows a blank where the legacy system
         // showed the bill's purpose.
         OpenedCharge opened = openLiveGatewayCharge(
-                targetReference, firstGeneration, payerName, amount, vaNumber, billNumber,
+                targetReference, firstGeneration, payerName, amount, keys, billNumber,
                 receivable.getDescription(), expiresAt);
         String consumerReference = opened.consumerReference();
         GatewayChargeResponse response = opened.response();
+        GatewayChargeResponse.Account account = accountAt(response, gatewayProperties.escrowCode());
+        String vaNumber = account.vaNumber();
 
         Charge charge = new Charge();
         charge.setGatewayChargeId(response.id());
@@ -550,6 +556,9 @@ public class CollectionService {
         charge.setCumulativePaid(BigDecimal.ZERO.setScale(2));
         charge.setEscrowCode(gatewayProperties.escrowCode());
         charge.setVaNumber(vaNumber);
+        charge.setInterbankVaNumber(account.interbankVaNumber());
+        charge.setPayerKey(keys.payerKey());
+        charge.setSlotKey(keys.slotKey());
         charge.setExpiresAt(expiresAt);
         Charge saved = chargeRepository.save(charge);
         contractEvents.chargeOpened(saved, receivable);
@@ -563,6 +572,28 @@ public class CollectionService {
 
     /** A gateway charge that is live, and the reference it was actually opened under. */
     private record OpenedCharge(String consumerReference, GatewayChargeResponse response) {
+    }
+
+    /**
+     * The VA the gateway allocated at {@code escrowCode}. A charge answered without one, or without
+     * the number in it, is refused: storing it would mirror a collection whose number nobody knows,
+     * and every notification and event that follows would carry a blank where the number belongs.
+     */
+    private static GatewayChargeResponse.Account accountAt(GatewayChargeResponse response, String escrowCode) {
+        if (response.accounts() == null) {
+            throw new IllegalStateException("gateway answered charge " + response.id() + " with no accounts");
+        }
+        GatewayChargeResponse.Account account = response.accounts().stream()
+                .filter(a -> escrowCode.equals(a.escrowCode()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("gateway answered charge " + response.id()
+                        + " with no account at escrow " + escrowCode));
+        if (account.vaNumber() == null || account.vaNumber().isBlank()
+                || account.interbankVaNumber() == null) {
+            throw new IllegalStateException("gateway answered charge " + response.id() + " at escrow "
+                    + escrowCode + " without the VA number it allocated");
+        }
+        return account;
     }
 
     /**
@@ -584,14 +615,14 @@ public class CollectionService {
      */
     private OpenedCharge openLiveGatewayCharge(
             String targetReference, int firstGeneration, String payerName, BigDecimal amount,
-            String vaNumber, String billNumber, String description, Instant expiresAt) {
+            VaKeys keys, String billNumber, String description, Instant expiresAt) {
         for (int generation = firstGeneration;
              generation < firstGeneration + MAX_GENERATION_ATTEMPTS; generation++) {
             String reference = generation <= 1
                     ? targetReference
                     : targetReference + GENERATION_SEPARATOR + generation;
             GatewayChargeResponse response = openGatewayChargeSupersedingVa(
-                    reference, payerName, amount, vaNumber, billNumber, description, expiresAt);
+                    reference, payerName, amount, keys, billNumber, description, expiresAt);
             ChargeStatus status = chargeStatus(response.status());
             if (status == ChargeStatus.ACTIVE) {
                 return new OpenedCharge(reference, response);
@@ -610,9 +641,9 @@ public class CollectionService {
     }
 
     /**
-     * Opens a gateway charge for {@code vaNumber}. A VA number points to at most one payable bill,
-     * so if the gateway reports the number already active (409), the new bill supersedes the old:
-     * cancel the still-collectible prior charge(s) on that number, then create the new one.
+     * Opens a gateway charge allocated from {@code keys}. A VA number points to at most one payable
+     * bill, so if the gateway reports the number already held ({@code 409 VA_NUMBER_BUSY}), the new
+     * bill supersedes the old: cancel the charge the refusal names, then create the new one.
      *
      * <p>This mirrors the legacy billing system, which reuses one VA number across successive single
      * bills (its way of doing installments — a 9M bill collected as three 3M bills on the same
@@ -621,37 +652,77 @@ public class CollectionService {
      * number across charges, so this path stays inert.
      */
     private GatewayChargeResponse openGatewayChargeSupersedingVa(
-            String consumerReference, String payerName, BigDecimal amount, String vaNumber,
+            String consumerReference, String payerName, BigDecimal amount, VaKeys keys,
             String billNumber, String description, Instant expiresAt) {
         GatewayChargeRequest request = new GatewayChargeRequest(
                 consumerReference, payerName, ChargeType.CLOSED.name(), amount, expiresAt, billNumber, description,
-                java.util.List.of(new GatewayChargeRequest.Account(gatewayProperties.escrowCode(), vaNumber)));
+                java.util.List.of(new GatewayChargeRequest.Account(gatewayProperties.escrowCode())),
+                keys.payerKey(), keys.slotKey());
         try {
-            return gatewayClient.openCharge(request);
+            return openGatewayCharge(request);
         } catch (HttpClientErrorException.Conflict e) {
-            if (!e.getResponseBodyAsString().contains("vaNumber already active")) {
+            GatewayProblem problem = GatewayProblem.of(e);
+            if (!"VA_NUMBER_BUSY".equals(problem.code())) {
                 throw e; // a different conflict (e.g. duplicate reference) — not ours to resolve
             }
-            supersedeActiveChargesOnVa(vaNumber);
-            return gatewayClient.openCharge(request);
+            supersedeHolder(problem);
+            return openGatewayCharge(request);
         }
     }
 
-    private void supersedeActiveChargesOnVa(String vaNumber) {
-        List<Charge> priors = chargeRepository.findByVaNumberAndStatusIn(
-                vaNumber, List.of(ChargeStatus.ACTIVE, ChargeStatus.PARTIALLY_PAID));
-        if (priors.isEmpty()) {
-            throw new IllegalStateException(
-                    "gateway reports VA " + vaNumber + " active but AR has no charge to supersede");
+    /**
+     * Ask the gateway for the charge, answering a payer key it cannot encode as the request's fault.
+     *
+     * <p>A debtor code too long for the escrow's number space, or not numeric, is a fact about what
+     * was asked for, and asking again changes nothing — so it is an {@link InvalidRequestException}
+     * with a code, not an illegal state. Over the contract the difference is whether the sender is
+     * answered with {@code invoice.rejected} or with nothing at all: on 2026-09-29 three of SPMB's
+     * test commands disappeared exactly this way, with their listener left waiting for a rejection
+     * that was never going to arrive. Every other refusal — a slot key the layout cannot hold, an
+     * escrow that cannot allocate — is ours to fix, and stays an error for an operator.
+     */
+    private GatewayChargeResponse openGatewayCharge(GatewayChargeRequest request) {
+        try {
+            return gatewayClient.openCharge(request);
+        } catch (HttpClientErrorException.BadRequest e) {
+            GatewayProblem problem = GatewayProblem.of(e);
+            if ("KEY_UNENCODABLE".equals(problem.code()) && "payerKey".equals(problem.field())) {
+                throw new InvalidRequestException("DEBTOR_CODE_UNENCODABLE",
+                        "Debtor code '" + request.payerKey() + "' cannot be encoded in a VA number at escrow "
+                                + problem.escrowCode() + ": " + problem.detail());
+            }
+            throw e;
         }
-        for (Charge prior : priors) {
-            gatewayClient.cancelCharge(prior.getGatewayChargeId());
-            // supersede(), not cancel(): this receivable is still owed and must be put back into
-            // collection when the number comes free. reopenSupersededReceivables() reads that mark.
-            prior.supersede(Instant.now(clock));
-            log.info("Superseded charge {} (VA {}) for a reused-VA new bill",
-                    prior.getConsumerReference(), vaNumber);
+    }
+
+    /**
+     * Supersede the charge the gateway says holds the number.
+     *
+     * <p>Exactly that one, named by the refusal. AR used to look up every live charge it held on
+     * the number and supersede them all, which needed the number before the call and trusted AR's
+     * mirror over the gateway's own answer.
+     */
+    private void supersedeHolder(GatewayProblem problem) {
+        String vaNumber = problem.vaNumber();
+        String heldBy = problem.heldByConsumerReference();
+        if (heldBy == null) {
+            // The gateway withholds another consumer's reference. A clash across consumers on a shared
+            // escrow is an operator's to resolve; superseding is only ever done to our own bills.
+            throw new IllegalStateException("gateway reports VA " + vaNumber + " at escrow "
+                    + problem.escrowCode() + " held by another consumer's charge");
         }
+        Charge prior = chargeRepository.findByConsumerReference(heldBy)
+                .orElseThrow(() -> new IllegalStateException("gateway reports VA " + vaNumber
+                        + " held by charge " + heldBy + " but AR has no charge under that reference"));
+        if (prior.getStatus() != ChargeStatus.ACTIVE && prior.getStatus() != ChargeStatus.PARTIALLY_PAID) {
+            throw new IllegalStateException("gateway reports VA " + vaNumber + " held by charge " + heldBy
+                    + " but AR has it as " + prior.getStatus() + " — the mirror has diverged");
+        }
+        gatewayClient.cancelCharge(prior.getGatewayChargeId());
+        // supersede(), not cancel(): this receivable is still owed and must be put back into
+        // collection when the number comes free. reopenSupersededReceivables() reads that mark.
+        prior.supersede(Instant.now(clock));
+        log.info("Superseded charge {} (VA {}) for a reused-VA new bill", prior.getConsumerReference(), vaNumber);
     }
 
     private static void put(Map<String, String> data, String key, String value) {
@@ -673,6 +744,7 @@ public class CollectionService {
         data.put("currency", currency);
         data.put("dueDate", dueDate.toString());
         data.put("vaNumber", charge.getVaNumber());
+        data.put("interbankVaNumber", charge.getInterbankVaNumber());
         data.put("escrowCode", charge.getEscrowCode());
         // Carried for hubs whose templates print them; harmless to a hub that ignores them. issueDate
         // in particular is NOT the due date, and the phone travels in the data whether or not SMS is

@@ -171,12 +171,23 @@ public class ContractEventService {
 
     // ------------------------------------------------------------------ charge and payment events
 
+    /**
+     * {@code interbankVaNumber} is the one the gateway composed, as stored on the charge. AR used to
+     * build it from its own copy of the interbank prefix, which was right only until the prefix
+     * changed or a second escrow existed. A charge opened before the gateway allocated numbers
+     * carries the one its deployment backfilled at the switch; one that still has none is refused
+     * rather than announced with a blank, because a payer told a blank number cannot pay.
+     */
     public String chargeOpened(Charge charge, Invoice invoice) {
+        if (charge.getInterbankVaNumber() == null) {
+            throw new IllegalStateException("charge " + charge.getConsumerReference()
+                    + " has no interbank VA number; charge.opened cannot be announced without it");
+        }
         ObjectNode p = JSON.createObjectNode();
         putInvoiceNumbers(p, invoice);
         p.put("debtorCode", invoice.getDebtor().getCode());
         p.put("vaNumber", charge.getVaNumber());
-        p.put("interbankVaNumber", properties.interbankVaPrefix() + charge.getVaNumber());
+        p.put("interbankVaNumber", charge.getInterbankVaNumber());
         p.put("bank", charge.getEscrowCode());
         p.put("amount", money(charge.getAmount()));
         p.put("expiresAt", charge.getExpiresAt().atZone(clock.getZone()).toLocalDate().minusDays(1).toString());

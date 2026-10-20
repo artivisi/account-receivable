@@ -25,10 +25,14 @@ import java.util.Set;
  */
 public interface NotificationPayloadMapper {
 
-    /** AR's own bill-issued variables. {@code email}, {@code phone}, {@code description} may be absent. */
+    /**
+     * AR's own bill-issued variables. {@code email}, {@code phone}, {@code description} may be absent.
+     * {@code interbankVaNumber} is the number a payer uses from another bank, as the gateway composed
+     * it; a template prints that rather than gluing its own copy of the prefix to {@code vaNumber}.
+     */
     Set<String> BILL_ISSUED_VARIABLES = Set.of(
             "debtorName", "invoiceNumber", "invoiceType", "amount", "currency", "dueDate", "vaNumber",
-            "escrowCode", "issueDate", "email", "phone", "description");
+            "interbankVaNumber", "escrowCode", "issueDate", "email", "phone", "description");
 
     /**
      * AR's own payment-received variables. {@code paidAt} is an ISO instant; {@code paidAtLocal} is the

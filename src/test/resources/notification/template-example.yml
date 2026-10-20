@@ -23,10 +23,10 @@ ar:
         "[noHp]": "{phone}"
         # unformatted; the hub's template does its own formatting
         "[jumlah]": "{amount}"
-        # prose, not a number: bank name plus the display-prefixed VA
-        "[rekening]": "${AR_NOTIFICATION_BANK_NAME} ${AR_NOTIFICATION_VA_DISPLAY_PREFIX}{vaNumber}"
+        # prose, not a number: bank name plus the number a payer dials from another bank
+        "[rekening]": "${AR_NOTIFICATION_BANK_NAME} {interbankVaNumber}"
         # injected as raw HTML by the hub, so several banks can be listed
-        "[rekeningFull]": "<ul><li>${AR_NOTIFICATION_BANK_NAME} ${AR_NOTIFICATION_VA_DISPLAY_PREFIX}{vaNumber}</li></ul>"
+        "[rekeningFull]": "<ul><li>${AR_NOTIFICATION_BANK_NAME} {interbankVaNumber}</li></ul>"
         # the bill type alone, not a description with the payer's name appended
         "[keterangan]": "{invoiceType}"
         "[contactinfo]": "${AR_NOTIFICATION_CONTACT_INFO}"
