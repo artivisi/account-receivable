@@ -320,8 +320,8 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
     /**
      * The gateway, not AR, now decides that a debtor code does not fit the number space. Its coded
      * refusal has to come back to the sender as a rejection: answered as an internal failure, the
-     * command would get no answer at all, which is how three of SPMB's commands vanished on
-     * 2026-09-29.
+     * command would get no answer at all, which is how three of an upstream application's commands
+     * vanished on 2026-09-29.
      */
     @Test
     void aDebtorCodeTheGatewayCannotEncode_isRejected_notLeftUnanswered() throws IOException {

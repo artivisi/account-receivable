@@ -676,9 +676,9 @@ public class CollectionService {
      * <p>A debtor code too long for the escrow's number space, or not numeric, is a fact about what
      * was asked for, and asking again changes nothing — so it is an {@link InvalidRequestException}
      * with a code, not an illegal state. Over the contract the difference is whether the sender is
-     * answered with {@code invoice.rejected} or with nothing at all: on 2026-09-29 three of SPMB's
-     * test commands disappeared exactly this way, with their listener left waiting for a rejection
-     * that was never going to arrive. Every other refusal — a slot key the layout cannot hold, an
+     * answered with {@code invoice.rejected} or with nothing at all: on 2026-09-29 three of an
+     * upstream application's test commands disappeared exactly this way, with its listener left
+     * waiting for a rejection that was never going to arrive. Every other refusal — a slot key the layout cannot hold, an
      * escrow that cannot allocate — is ours to fix, and stays an error for an operator.
      */
     private GatewayChargeResponse openGatewayCharge(GatewayChargeRequest request) {
