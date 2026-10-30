@@ -28,6 +28,7 @@ class InstallmentCollectionIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired ChargeRepository chargeRepository;
     @Autowired InstallmentRepricer repricer;
+    @Autowired com.artivisi.accountreceivable.service.CollectionService collectionService;
     private ApiClient api;
 
     @BeforeEach
@@ -194,6 +195,62 @@ class InstallmentCollectionIntegrationTest extends AbstractIntegrationTest {
                 .body("installments.findAll { it.paymentStatus == 'PARTIALLY_PAID' }.size()", equalTo(0))
                 .body("installments.sequence.sort()", equalTo(List.of(1, 2, 3, 4, 5)))
                 .body("outstanding", equalTo(3_500_000.0F));
+    }
+
+    @Test
+    void amendPlan_keepsAnOverdueLegOnItsDate_soThePayerCanClearItAlone() {
+        // Two legs overdue, so the VA asks for both. Relief is approved: the payer clears the older
+        // leg first and the rest moves out. The older leg keeps the date it fell due — aging must
+        // still see it as late — and the VA drops to that leg alone.
+        LocalDate older = LocalDate.now().minusDays(20);
+        String invoiceId = seedPlan("plan-relief", older, LocalDate.now().minusDays(5), LocalDate.now().plusDays(40));
+        api.openCharge(invoiceId).then().body("amount", equalTo(4_000_000.0F));
+
+        api.amendPlan(invoiceId, List.of(
+                        ApiClient.installment(older, 2_000_000),
+                        ApiClient.installment(LocalDate.now().plusDays(30), 2_000_000),
+                        ApiClient.installment(LocalDate.now().plusDays(60), 2_000_000)),
+                "Keringanan disetujui: termin lama dahulu")
+                .then().statusCode(200)
+                .body("installments[0].dueDate", equalTo(older.toString()))
+                .body("dueDate", equalTo(LocalDate.now().plusDays(60).toString()))
+                .body("outstanding", equalTo(6_000_000.0F));
+        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("2000000");
+
+        payLive(invoiceId, "RELIEF-1", 2_000_000);
+        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("2000000");
+    }
+
+    @Test
+    void amendPlan_appendsAMonthBehindArrears_withoutMovingThem() {
+        // Monthly billing: one month unpaid and overdue, the next one is added to the same invoice.
+        // amended raises the total, then the plan gives the new month its own date while the arrears
+        // stay where they fell due.
+        LocalDate overdue = LocalDate.now().minusDays(10);
+        String invoiceId = seedPlan("plan-append", overdue);
+        api.openCharge(invoiceId).then().body("amount", equalTo(6_000_000.0F));
+
+        collectionService.amendAmount(invoiceId, new java.math.BigDecimal("8000000"), "Bulan berikutnya", null);
+        api.amendPlan(invoiceId, List.of(
+                        ApiClient.installment(overdue, 6_000_000),
+                        ApiClient.installment(LocalDate.now().plusDays(20), 2_000_000)),
+                "Bulan berikutnya")
+                .then().statusCode(200)
+                .body("installments[0].dueDate", equalTo(overdue.toString()))
+                .body("installments[1].dueDate", equalTo(LocalDate.now().plusDays(20).toString()));
+        // Only the overdue month is due today; the new one is not asked for early.
+        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("6000000");
+    }
+
+    @Test
+    void amendPlan_refusesAPlanWhollyInThePast() {
+        // The VA expires with the last leg, so such a plan would be unpayable the moment it lands.
+        String invoiceId = seedPlan("plan-past", LocalDate.now().plusDays(10), LocalDate.now().plusDays(40));
+        api.amendPlan(invoiceId, List.of(
+                        ApiClient.installment(LocalDate.now().minusDays(10), 3_000_000),
+                        ApiClient.installment(LocalDate.now().minusDays(1), 3_000_000)),
+                "salah")
+                .then().statusCode(400);
     }
 
     @Test

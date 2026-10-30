@@ -50,9 +50,26 @@ Tindakan yang tersedia di detail:
 | **Ubah Jatuh Tempo** | memindahkan tanggal jatuh tempo (non-cicilan) dan meneruskannya ke gateway |
 | **Write off** | menghapusbukukan faktur penuh → status `WRITTEN_OFF` |
 | **Issue credit note** | menerbitkan nota kredit sebesar nominal tertentu, mengurangi outstanding |
+| **Catat Pembayaran di Luar VA** | membukukan uang yang diterima tanpa lewat VA (tunai, transfer langsung, QRIS, EDC) |
 
 Write-off selalu untuk **satu faktur penuh** (perubahan `paymentStatus`), bukan dokumen bernilai
 sebagian.
+
+### Pembayaran di luar VA
+
+Uang yang masuk tanpa lewat VA — tunai di loket, transfer langsung ke rekening institusi, QRIS, atau
+mesin EDC — dicatat lewat **Catat Pembayaran di Luar VA**, bukan dengan nota kredit atau write-off.
+Nota kredit berarti utangnya dikurangi tanpa uang diterima, dan write-off berarti utangnya dihapus;
+keduanya membuat laporan membaca uang yang sebenarnya diterima sebagai potongan atau kerugian.
+
+Isi nilai, saluran, nomor bukti (kuitansi atau referensi transfer), dan waktu uang diterima sesuai
+bukti — bukan waktu pencatatan. Akibatnya sama dengan pembayaran lewat VA: sisa faktur berkurang
+(pada faktur cicilan dialokasikan ke cicilan tertua lebih dahulu), VA-nya disesuaikan ke sisa baru
+atau ditutup bila lunas, dan aplikasi hulu menerima `payment.received` dengan `source: RECORDED`.
+
+Satu nomor bukti hanya bisa dicatat sekali; nomor yang sama ditolak beserta catatan pembayaran yang
+sudah memakainya. Nilai yang melebihi sisa faktur juga ditolak — kelebihan bayar di loket diselesaikan
+di loket. Formulir ini hanya tampil bagi ADMIN dan OPERATOR.
 
 ### Pembayar datang setelah lewat jatuh tempo
 

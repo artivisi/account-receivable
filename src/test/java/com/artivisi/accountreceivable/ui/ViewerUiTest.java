@@ -37,6 +37,7 @@ class ViewerUiTest extends PlaywrightTestBase {
 
         APIResponse writeOff = postWithToken("/admin/invoices/does-not-exist/write-off");
         assertThat(writeOff.status()).isEqualTo(403);
+        assertThat(postWithToken("/admin/invoices/does-not-exist/payments").status()).isEqualTo(403);
 
         assertThat(page.request().get(baseUrl() + "/admin/invoices/new").status()).isEqualTo(403);
         assertThat(page.request().get(baseUrl() + "/admin/bulk-uploads").status()).isEqualTo(403);

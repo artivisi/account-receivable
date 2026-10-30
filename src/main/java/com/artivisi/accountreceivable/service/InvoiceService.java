@@ -298,11 +298,18 @@ public class InvoiceService {
         LocalDate today = today();
         BigDecimal total = BigDecimal.ZERO;
         int sequence = kept.size() + 1;
+        // Earlier legs may be dated in the past. A reschedule after arrears keeps the overdue leg on
+        // the date it fell due — that is what aging measures, and moving it to today would erase the
+        // lateness — and an approved relief that lets a payer clear the old leg first is exactly an
+        // overdue leg followed by later ones. Only the last leg must not have passed: the plan's VA
+        // expires with it, so a plan wholly in the past would be unpayable the moment it is recorded.
+        LocalDate lastNew = legs.stream().map(IssueInvoiceRequest.InstallmentRequest::dueDate)
+                .max(java.util.Comparator.naturalOrder()).orElseThrow();
+        if (lastNew.isBefore(today)) {
+            throw new InvalidRequestException("PLAN_INVALID", "The last new installment (" + lastNew
+                    + ") may not fall due before today; the plan's VA expires with it");
+        }
         for (IssueInvoiceRequest.InstallmentRequest lr : legs) {
-            if (sequence == kept.size() + 1 && lr.dueDate().isBefore(today)) {
-                throw new InvalidRequestException("PLAN_INVALID", "The first new installment (" + lr.dueDate()
-                        + ") may not fall due before today");
-            }
             BigDecimal amount = exactMoney(lr.amount(), "installment " + sequence + " amount");
             Installment leg = new Installment();
             leg.setSequence(sequence++);

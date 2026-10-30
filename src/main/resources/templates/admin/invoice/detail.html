@@ -184,7 +184,8 @@
                 <div class="mb-1 text-sm font-semibold text-slate-700">Nota Kredit</div>
                 <p class="mb-3 text-xs text-slate-500">
                     Untuk beasiswa, potongan, dan koreksi nilai. Sisa tagihan berkurang, nilai faktur tetap,
-                    dan VA-nya ikut disesuaikan — ditutup bila sisanya nol. Jangan dipakai mencatat uang masuk.
+                    dan VA-nya ikut disesuaikan — ditutup bila sisanya nol. Jangan dipakai mencatat uang masuk;
+                    uang yang diterima di luar VA dicatat di <em>Catat Pembayaran di Luar VA</em>.
                 </p>
                 <form id="credit-note-form" class="flex flex-wrap items-end gap-3" method="post"
                       th:action="@{/admin/invoices/{id}/credit-notes(id=${invoice.id})}">
@@ -200,6 +201,35 @@
                     <div><label class="label" for="credit-note-reference">Rujukan (nomor SK)</label><input id="credit-note-reference" class="input" name="reference"/></div>
                     <div class="grow"><label class="label" for="credit-note-reason">Alasan</label><input id="credit-note-reason" class="input" name="reason"/></div>
                     <button id="btn-issue-credit-note" class="btn-ghost" type="submit">Nota Kredit</button>
+                </form>
+            </div>
+
+            <div sec:authorize="hasAnyRole('ADMIN','OPERATOR')" class="card p-6" th:if="${invoice.collectible() and invoice.outstanding().signum() > 0}">
+                <div class="mb-1 text-sm font-semibold text-slate-700">Catat Pembayaran di Luar VA</div>
+                <p class="mb-3 text-xs text-slate-500">
+                    Untuk uang yang benar-benar diterima tanpa lewat VA: tunai di loket, transfer langsung ke rekening
+                    institusi, QRIS, atau mesin EDC. Sisa tagihan berkurang dan VA-nya ikut disesuaikan — ditutup bila
+                    lunas. Nomor bukti harus unik; satu bukti hanya bisa dicatat sekali. Waktu diisi sesuai bukti,
+                    bukan waktu pencatatan.
+                </p>
+                <form id="record-payment-form" class="flex flex-wrap items-end gap-3" method="post"
+                      th:action="@{/admin/invoices/{id}/payments(id=${invoice.id})}"
+                      onsubmit="return confirm('Catat pembayaran ini? Uangnya harus sudah benar-benar diterima.');">
+                    <div><label class="label" for="record-payment-amount">Nilai</label><input id="record-payment-amount" class="input" name="amount" required/></div>
+                    <div>
+                        <label class="label" for="record-payment-channel">Saluran</label>
+                        <select id="record-payment-channel" class="input" name="channel" required>
+                            <option value="" disabled selected>Pilih…</option>
+                            <option value="CASH">Tunai</option>
+                            <option value="TRANSFER">Transfer langsung</option>
+                            <option value="QRIS">QRIS</option>
+                            <option value="EDC">EDC</option>
+                        </select>
+                    </div>
+                    <div><label class="label" for="record-payment-reference">Nomor bukti</label><input id="record-payment-reference" class="input" name="reference" required/></div>
+                    <div><label class="label" for="record-payment-received-at">Waktu diterima</label><input id="record-payment-received-at" class="input" type="datetime-local" name="receivedAt" required/></div>
+                    <div class="grow"><label class="label" for="record-payment-reason">Keterangan</label><input id="record-payment-reason" class="input" name="reason"/></div>
+                    <button id="btn-record-payment" class="btn-ghost" type="submit">Catat Pembayaran</button>
                 </form>
             </div>
         </div>

@@ -7,7 +7,10 @@ import java.time.LocalDate;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
-/** Single-payment invoice lifecycle through the UI: issue, open charge, write off, credit note. */
+/**
+ * Single-payment invoice lifecycle through the UI: issue, open charge, write off, credit note, and a
+ * payment received outside the VA.
+ */
 class InvoiceLifecycleUiTest extends PlaywrightTestBase {
 
     private String debtor;
@@ -64,6 +67,7 @@ class InvoiceLifecycleUiTest extends PlaywrightTestBase {
         assertThat(page.locator("#btn-open-charge")).isHidden();
         assertThat(page.locator("#btn-write-off")).isHidden();
         assertThat(page.locator("#credit-note-form")).isHidden();
+        assertThat(page.locator("#record-payment-form")).isHidden();
     }
 
     @Test
@@ -78,6 +82,7 @@ class InvoiceLifecycleUiTest extends PlaywrightTestBase {
         assertThat(page.locator("#btn-open-charge")).isHidden();
         assertThat(page.locator("#btn-write-off")).isHidden();
         assertThat(page.locator("#credit-note-form")).isHidden();
+        assertThat(page.locator("#record-payment-form")).isHidden();
     }
 
     @Test
@@ -90,5 +95,46 @@ class InvoiceLifecycleUiTest extends PlaywrightTestBase {
         page.fill("#credit-note-reason", "Koreksi tagihan");
         page.click("#btn-issue-credit-note");
         assertThat(page.locator("#flash-msg")).containsText("Nota kredit berhasil diterbitkan");
+    }
+
+    @Test
+    void recordPaymentOutsideTheVa_reducesOutstanding_thenSettles() {
+        String id = apiClient().issueSingle(debtor, type, 1_000_000, LocalDate.now(), LocalDate.now().plusDays(30))
+                .path("id");
+        // No charge opened: settling one here would leave a gateway cancellation pending in the shared
+        // database for whichever test dispatches next. That the VA closes is pinned at the contract
+        // level (ContractCommandHandlerIntegrationTest.recordedInFull_booksTheCashAndStopsTheVaAskingForMoney).
+        page.onDialog(dialog -> dialog.accept());
+
+        page.navigate(baseUrl() + "/admin/invoices/" + id);
+        recordPayment("400000", "CASH", "KWT-" + unique());
+        assertThat(page.locator("#flash-msg")).containsText("berhasil dicatat");
+        assertThat(page.locator("#invoice-outstanding")).containsText("600.000");
+
+        recordPayment("600000", "TRANSFER", "TRF-" + unique());
+        assertThat(page.locator("#invoice-status")).hasText("LUNAS");
+        assertThat(page.locator("#record-payment-form")).isHidden();
+    }
+
+    @Test
+    void recordPayment_refusesAReceiptAlreadyBooked() {
+        String id = apiClient().issueSingle(debtor, type, 1_000_000, LocalDate.now(), LocalDate.now().plusDays(30))
+                .path("id");
+        page.onDialog(dialog -> dialog.accept());
+        String receipt = "KWT-" + unique();
+
+        page.navigate(baseUrl() + "/admin/invoices/" + id);
+        recordPayment("100000", "CASH", receipt);
+        recordPayment("100000", "CASH", receipt);
+        assertThat(page.locator("#flash-error")).containsText(receipt);
+        assertThat(page.locator("#invoice-outstanding")).containsText("900.000");
+    }
+
+    private void recordPayment(String amount, String channel, String reference) {
+        page.fill("#record-payment-amount", amount);
+        page.selectOption("#record-payment-channel", channel);
+        page.fill("#record-payment-reference", reference);
+        page.fill("#record-payment-received-at", "2026-10-30T09:15");
+        page.click("#btn-record-payment");
     }
 }

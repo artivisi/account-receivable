@@ -1534,7 +1534,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "description": "Nomor persetujuan di aplikasi pengirim yang mendasari perubahan ini, misalnya nomor permohonan keringanan yang sudah disetujui atau nomor SK. Dicatat di audit AR dan dikembalikan pada event jawaban, supaya perubahan dapat ditelusuri ke rantai persetujuannya. Opsional sejak revisi 4; direncanakan wajib pada revisi 5."
+      "description": "Nomor persetujuan di aplikasi pengirim yang mendasari perubahan ini, misalnya nomor permohonan keringanan yang sudah disetujui atau nomor SK. Dicatat di audit AR dan dikembalikan pada event jawaban, supaya perubahan dapat ditelusuri ke rantai persetujuannya. Opsional sejak revisi 4 dan tetap opsional: sebagian perintah dikirim otomatis tanpa keputusan orang."
     }
   }
 }

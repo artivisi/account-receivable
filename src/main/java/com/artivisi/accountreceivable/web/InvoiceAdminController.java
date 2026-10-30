@@ -9,6 +9,8 @@ import com.artivisi.accountreceivable.dto.ReviewQueueItem;
 import com.artivisi.accountreceivable.dto.InvoiceResponse;
 import com.artivisi.accountreceivable.dto.InvoiceTypeResponse;
 import com.artivisi.accountreceivable.dto.IssueInvoiceRequest;
+import com.artivisi.accountreceivable.dto.RecordPaymentRequest;
+import com.artivisi.accountreceivable.entity.PaymentChannel;
 import com.artivisi.accountreceivable.entity.ChargeStatus;
 import com.artivisi.accountreceivable.entity.CreditNote;
 import com.artivisi.accountreceivable.repository.AuditEventRepository;
@@ -34,6 +36,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -301,6 +304,33 @@ public class InvoiceAdminController {
         try {
             collectionService.issueCreditNote(new CreditNoteRequest(id, amount, reasonCode, reference, reason));
             ra.addFlashAttribute("msg", "Nota kredit berhasil diterbitkan");
+        } catch (RuntimeException e) {
+            ra.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/admin/invoices/" + id;
+    }
+
+    /**
+     * Book money that reached the institution without passing through a VA: cash at the finance
+     * counter, a transfer straight to a campus account, QRIS, a card terminal. The same path an
+     * upstream app reaches through {@code payment.recorded}, so the VA is repriced or closed and the
+     * upstream apps hear about it as {@code payment.received} with {@code source: RECORDED}.
+     *
+     * <p>The time is when the money changed hands, typed by the operator from the receipt — not when
+     * the form was submitted, because a receipt booked three days late still belongs to the day the
+     * cash was taken. The currency is the invoice's own; a counter takes rupiah for a rupiah bill.
+     */
+    @PostMapping("/{id}/payments")
+    public String recordPayment(@PathVariable String id, @RequestParam BigDecimal amount,
+                                @RequestParam PaymentChannel channel,
+                                @RequestParam String reference,
+                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime receivedAt,
+                                @RequestParam(required = false) String reason, RedirectAttributes ra) {
+        try {
+            InvoiceResponse invoice = invoiceService.get(id);
+            collectionService.recordPayment(new RecordPaymentRequest(id, amount, invoice.currency(),
+                    receivedAt.atZone(clock.getZone()).toInstant(), channel, reference, reason, null));
+            ra.addFlashAttribute("msg", "Pembayaran " + reference + " berhasil dicatat");
         } catch (RuntimeException e) {
             ra.addFlashAttribute("error", e.getMessage());
         }
