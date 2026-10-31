@@ -775,4 +775,106 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
         assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("SCHEMA_INVALID");
     }
+
+    // ------------------------------------------------------------------ scoped command topics
+
+    private static final String SCOPED = "scoped-command-test";   // confined to type 41 in the test config
+
+    private void ensureType(String code) {
+        if (invoiceTypeRepository.findByCode(code).isEmpty()) {
+            InvoiceType t = new InvoiceType();
+            t.setCode(code);
+            t.setName("Type " + code);
+            t.setActive(true);
+            invoiceTypeRepository.save(t);
+        }
+    }
+
+    private void assertRefusedNotPermitted(int mark) throws IOException {
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.rejected");
+        assertThat(payloadOf(events.getFirst()).get("code").asText()).isEqualTo("COMMAND_NOT_PERMITTED");
+    }
+
+    @Test
+    void scopedTopic_issuesAnInvoiceOfItsOwnType() throws IOException {
+        ensureType("41");
+        String message = requestWith(java.util.Map.of("invoiceTypeCode", "41", "openCharge", false));
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handleScoped(SCOPED, message);
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.issued");
+        assertThat(payloadOf(events.getFirst()).get("invoiceTypeCode").asText()).isEqualTo("41");
+    }
+
+    @Test
+    void scopedTopic_refusesAnotherAppsInvoiceType_andCreatesNothing() throws IOException {
+        String message = requestWith(java.util.Map.of("invoiceTypeCode", "40"));
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handleScoped(SCOPED, message);
+
+        assertRefusedNotPermitted(mark);
+        assertThat(commands.findByIdempotencyKey(keyOf(message))).isEmpty();
+    }
+
+    @Test
+    void scopedTopic_cannotBookAPaymentOnAnotherAppsInvoice() throws IOException {
+        // The hazard the scope exists for: since payment.recorded, a writer on the shared topic can
+        // mark any invoice paid and close its VA.
+        String invoiceNumber = issueSingle();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handleScoped(SCOPED, recordedOf("valid-cash-settles-invoice.json", invoiceNumber, "6500000.00"));
+
+        assertRefusedNotPermitted(mark);
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getOutstanding())
+                .as("nothing booked").isEqualByComparingTo("6500000.00");
+    }
+
+    @Test
+    void scopedTopic_cannotCancelAnotherAppsInvoice() throws IOException {
+        String invoiceNumber = issueSingle();
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handleScoped(SCOPED, fixture("commands/invoice.cancelled/valid-duplicate.json", invoiceNumber));
+
+        assertRefusedNotPermitted(mark);
+        assertThat(invoiceRepository.findByInvoiceNumber(invoiceNumber).orElseThrow().getPaymentStatus())
+                .isNotEqualTo(PaymentStatus.CANCELLED);
+    }
+
+    @Test
+    void scopedTopic_mayNotRewriteASharedDebtor() throws IOException {
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+        handler.handleScoped(SCOPED, fixture("commands/debtor.upserted/valid.json"));
+        assertRefusedNotPermitted(mark);
+    }
+
+    @Test
+    void scopedTopic_reusingAKeyAnotherProducerSpent_isRefusedNotAnsweredFromTheStore() throws IOException {
+        // The scope is checked before the idempotency store, so a scoped producer cannot obtain another
+        // producer's stored answer — or have its own command silently swallowed — by colliding keys.
+        String message = fixture("commands/invoice.requested/valid-single-payment.json", null);
+        handler.handle("invoice-command", message);
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handleScoped(SCOPED, message);
+
+        assertRefusedNotPermitted(mark);
+    }
+
+    @Test
+    void aTopicWithNoConfiguredScope_isNeverExecuted() throws IOException {
+        long failuresBefore = failures.count();
+        String message = requestWith(java.util.Map.of("invoiceTypeCode", "40"));
+
+        handler.handleScoped("not-configured", message);
+
+        assertThat(failures.count()).isEqualTo(failuresBefore + 1);
+        assertThat(commands.findByIdempotencyKey(keyOf(message))).isEmpty();
+    }
 }
+

@@ -44,6 +44,7 @@ public class ContractCommandHandler {
     private final ContractEventService events;
     private final ContractCommandRepository commandRepository;
     private final ContractFailureRepository failureRepository;
+    private final ScopedCommandTopics scopedTopics;
     private final Clock clock;
     private final JsonSchemaFactory schemaFactory;
     private final SchemaValidatorsConfig schemaConfig;
@@ -52,17 +53,38 @@ public class ContractCommandHandler {
     public ContractCommandHandler(ContractCommandService commands, ContractEventService events,
                                   ContractCommandRepository commandRepository,
                                   ContractFailureRepository failureRepository,
-                                  Clock clock) {
+                                  ScopedCommandTopics scopedTopics, Clock clock) {
         this.commands = commands;
         this.events = events;
         this.commandRepository = commandRepository;
         this.failureRepository = failureRepository;
+        this.scopedTopics = scopedTopics;
         this.clock = clock;
         this.schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
         this.schemaConfig = SchemaValidatorsConfig.builder().formatAssertionsEnabled(true).build();
     }
 
+    /** A message from a shared command topic: it may touch any invoice. */
     public void handle(String topic, String message) {
+        handle(topic, message, ScopedCommandTopics.CommandScope.shared(topic));
+    }
+
+    /**
+     * A message from one producer's own topic: it may touch only that producer's invoice types. A
+     * topic with no configured scope cannot be subscribed to, so reaching here without one is a
+     * defect — recorded as a failure, never executed as if it were unrestricted.
+     */
+    public void handleScoped(String topic, String message) {
+        ScopedCommandTopics.CommandScope scope = scopedTopics.scopeOf(topic).orElse(null);
+        if (scope == null) {
+            log.error("Message on {} has no configured scope; not executed", topic);
+            recordFailure(topic, null, message, new IllegalStateException("no scope configured for " + topic));
+            return;
+        }
+        handle(topic, message, scope);
+    }
+
+    private void handle(String topic, String message, ScopedCommandTopics.CommandScope scope) {
         JsonNode root;
         try {
             root = JSON.readTree(message);
@@ -90,6 +112,16 @@ public class ContractCommandHandler {
         if (!errors.isEmpty()) {
             reject(debtorCode, correlationId, "SCHEMA_INVALID",
                     errors.stream().map(ValidationMessage::getMessage).collect(Collectors.joining("; ")));
+            return;
+        }
+
+        // Before the idempotency store: a command its sender may not give is refused even when its
+        // key matches one another producer already used, rather than answered with that producer's
+        // stored result.
+        try {
+            commands.assertPermitted(scope, type, payload);
+        } catch (ContractRejectedException e) {
+            reject(debtorCode, correlationId, e.getCode(), e.getMessage());
             return;
         }
 

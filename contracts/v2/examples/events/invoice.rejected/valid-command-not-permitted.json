@@ -1,0 +1,11 @@
+{
+  "type": "invoice.rejected",
+  "eventId": "019a3a1e-4c2d-7f10-8b6e-2d5c9a0e7b13",
+  "occurredAt": "2026-10-31T09:20:11+07:00",
+  "producer": "account-receivable",
+  "payload": {
+    "correlationId": "housing:rent:2600000001:2026-11:cash",
+    "code": "COMMAND_NOT_PERMITTED",
+    "reason": "payment.recorded on invoice-command-v2-housing may only touch invoice types [91]; this is type 40"
+  }
+}

@@ -300,6 +300,46 @@ public class ContractCommandService {
         return onInvoiceEvent(code, null);
     }
 
+    /**
+     * Refuse a command its topic does not allow. Unrestricted on a shared topic; on a producer's own
+     * topic, only invoices of that producer's types, and no debtor records at all — a debtor is shared
+     * by every application that bills the same person, so one producer rewriting the name or contact
+     * another relies on is not that producer's decision to make.
+     *
+     * <p>An invoice that cannot be found is left to the command itself, which answers
+     * {@code INVOICE_NOT_FOUND}; nothing can be touched through a number that resolves to nothing.
+     */
+    @Transactional(readOnly = true)
+    public void assertPermitted(ScopedCommandTopics.CommandScope scope, String type, JsonNode payload) {
+        if (scope.unrestricted()) {
+            return;
+        }
+        if ("debtor.upserted".equals(type)) {
+            throw new ContractRejectedException("COMMAND_NOT_PERMITTED", "debtor records are shared;"
+                    + " " + scope.topic() + " may not change them");
+        }
+        String typeCode;
+        if (payload.hasNonNull("invoiceTypeCode")) {
+            typeCode = payload.get("invoiceTypeCode").asText();
+        } else if (payload.hasNonNull("invoiceNumber")) {
+            Invoice invoice = resolve(payload.get("invoiceNumber").asText()).orElse(null);
+            if (invoice == null) {
+                return;
+            }
+            typeCode = invoice.getInvoiceType().getCode();
+        } else {
+            // Closed by default: a command that names no invoice cannot be confined to a type, so a
+            // scoped topic does not carry it until someone decides what its scope means.
+            throw new ContractRejectedException("COMMAND_NOT_PERMITTED", type + " names no invoice; "
+                    + scope.topic() + " carries only commands about its own invoice types");
+        }
+        if (!scope.permits(typeCode)) {
+            throw new ContractRejectedException("COMMAND_NOT_PERMITTED", type + " on " + scope.topic()
+                    + " may only touch invoice types " + scope.invoiceTypes().stream().sorted().toList()
+                    + "; this is type " + typeCode);
+        }
+    }
+
     // ------------------------------------------------------------------ helpers
 
     /**

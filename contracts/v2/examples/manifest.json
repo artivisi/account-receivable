@@ -277,6 +277,12 @@
       "note": "Penolakan charge.openRequested: nomor VA-nya masih menagih tagihan lain milik debitur dan jenis yang sama."
     },
     {
+      "file": "examples/events/invoice.rejected/valid-command-not-permitted.json",
+      "schemaRef": "#/$defs/event.invoice.rejected",
+      "schemaValid": true,
+      "note": "Perintah dari topic milik satu aplikasi yang menyentuh tagihan berjenis di luar jenis milik aplikasi itu. Tidak ada yang dieksekusi."
+    },
+    {
       "file": "examples/commands/payment.recorded/valid-cash-settles-invoice.json",
       "schemaRef": "#/$defs/command.payment.recorded",
       "schemaValid": true,

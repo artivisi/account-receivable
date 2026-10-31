@@ -561,6 +561,7 @@
             "DEBTOR_CODE_UNENCODABLE",
             "INVOICE_NOT_PAYABLE",
             "REFERENCE_DUPLICATE",
+            "COMMAND_NOT_PERMITTED",
             "SCHEMA_INVALID"
           ]
         },

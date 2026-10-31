@@ -1,6 +1,7 @@
 package com.artivisi.accountreceivable.config;
 
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -22,7 +23,13 @@ public record ArContractProperties(
         @Min(1) int maxInstallments,
         @Min(1) int maxAttempts,
         @Min(0) long backoffBaseSeconds,
-        @Min(1) long pollIntervalMs
+        @Min(1) long pollIntervalMs,
+        /**
+         * Command topics each confined to the invoice types one producer owns, as
+         * {@code topic=CODE,CODE;topic=CODE}. Empty means none. Required, so a deployment states it
+         * rather than inheriting it; parsed and checked by {@code ScopedCommandTopics}.
+         */
+        @NotNull String scopedCommandTopics
 ) {
     public record Topics(String invoiceCommand, String debtorCommand, String invoiceEvent, String paymentEvent) {
     }

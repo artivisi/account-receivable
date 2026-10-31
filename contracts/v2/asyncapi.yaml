@@ -34,6 +34,25 @@ channels:
       invoice.announcementRequested: { $ref: '#/components/messages/invoice.announcementRequested' }
       charge.openRequested: { $ref: '#/components/messages/charge.openRequested' }
       payment.recorded: { $ref: '#/components/messages/payment.recorded' }
+  scopedInvoiceCommand:
+    address: '{scopedTopic}'
+    parameters:
+      scopedTopic:
+        description: Nama topic milik satu aplikasi, ditetapkan per deployment.
+    description: |
+      Perintah tagihan dari satu aplikasi hulu, di topic miliknya sendiri. Isinya sama dengan
+      invoiceCommand, tetapi hanya boleh menyentuh tagihan berjenis yang ditetapkan untuk topic
+      itu; perintah di luarnya ditolak COMMAND_NOT_PERMITTED tanpa dieksekusi. debtor.upserted
+      tidak diterima di sini, karena data debitur dipakai bersama semua aplikasi. Key = debtorCode.
+    messages:
+      invoice.requested: { $ref: '#/components/messages/invoice.requested' }
+      invoice.amended: { $ref: '#/components/messages/invoice.amended' }
+      invoice.planAmended: { $ref: '#/components/messages/invoice.planAmended' }
+      invoice.cancelled: { $ref: '#/components/messages/invoice.cancelled' }
+      invoice.credited: { $ref: '#/components/messages/invoice.credited' }
+      invoice.announcementRequested: { $ref: '#/components/messages/invoice.announcementRequested' }
+      charge.openRequested: { $ref: '#/components/messages/charge.openRequested' }
+      payment.recorded: { $ref: '#/components/messages/payment.recorded' }
   debtorCommand:
     address: debtor-command-v2
     description: Pendaftaran dan pembaruan debitur. Key = debtorCode.
@@ -70,6 +89,10 @@ operations:
     action: send
     channel: { $ref: '#/channels/invoiceCommand' }
     summary: Aplikasi hulu mengirim perintah tagihan.
+  sendScopedInvoiceCommand:
+    action: send
+    channel: { $ref: '#/channels/scopedInvoiceCommand' }
+    summary: Aplikasi hulu mengirim perintah tagihan di topic miliknya sendiri.
   sendDebtorCommand:
     action: send
     channel: { $ref: '#/channels/debtorCommand' }

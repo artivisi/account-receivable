@@ -274,6 +274,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("ar.contract.topics.invoice-event", () -> "invoice-event-test");
         registry.add("ar.contract.topics.payment-event", () -> "payment-event-test");
         registry.add("ar.contract.max-installments", () -> "12");
+        registry.add("ar.contract.scoped-command-topics", () -> "scoped-command-test=41");
         registry.add("ar.contract.max-attempts", () -> "3");
         registry.add("ar.contract.backoff-base-seconds", () -> "0");
         registry.add("ar.contract.poll-interval-ms", () -> "3600000");

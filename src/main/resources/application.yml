@@ -90,6 +90,10 @@ ar:
     max-attempts: ${AR_CONTRACT_MAX_ATTEMPTS}
     backoff-base-seconds: ${AR_CONTRACT_BACKOFF_BASE_SECONDS}
     poll-interval-ms: ${AR_CONTRACT_POLL_INTERVAL_MS}
+    # Command topics confined to one producer's invoice types: topic=CODE,CODE;topic=CODE. Empty
+    # (set, but blank) means none. A producer on such a topic cannot touch another app's invoices,
+    # which the shared invoice-command topic cannot express. Required.
+    scoped-command-topics: ${AR_CONTRACT_SCOPED_COMMAND_TOPICS}
 
 management:
   endpoints:

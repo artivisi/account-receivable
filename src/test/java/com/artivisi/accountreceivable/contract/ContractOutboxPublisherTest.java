@@ -30,7 +30,7 @@ class ContractOutboxPublisherTest {
     private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
     private final ContractEventOutboxRepository repository = mock(ContractEventOutboxRepository.class);
     private final ArContractProperties properties = new ArContractProperties(
-            ArContractProperties.Mode.KAFKA, "ar", null, 12, 3, 30, 5000);
+            ArContractProperties.Mode.KAFKA, "ar", null, 12, 3, 30, 5000, "");
     private final ContractOutboxPublisher publisher =
             new ContractOutboxPublisher(repository, kafka, properties, Clock.systemUTC());
 
