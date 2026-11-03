@@ -270,6 +270,21 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void announcementRequested_onAPlan_resendsThePlanAsItStands() throws IOException {
+        String invoiceNumber = issuePlan();
+        int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command",
+                fixture("commands/invoice.announcementRequested/valid.json", invoiceNumber));
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, before);
+        assertThat(events).extracting(ContractEventOutbox::getEventType)
+                .containsExactly("invoice.issued", "invoice.planAmended", "charge.opened");
+        assertThat(payloadOf(events.get(1)).get("reason").asText()).isEqualTo("ANNOUNCED");
+        assertThat(payloadOf(events.get(1)).get("paymentPlan")).hasSize(3);
+    }
+
+    @Test
     void anInvoiceKnownByOneNumberOnly_carriesNoSourceNumber() throws IOException {
         int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
         issuePlan();
@@ -421,6 +436,96 @@ class ContractCommandHandlerIntegrationTest extends AbstractIntegrationTest {
         assertThat(payloadOf(events.get(1)).get("reason").asText()).isEqualTo("PLAN_AMENDED");
         assertThat(payloadOf(events.get(1)).get("amount").asText()).isEqualTo("1625000.00");
         assertThat(gatewayRepriceCount()).isEqualTo(repricesBefore + 1);
+    }
+
+    /** A due-date-only amendment with a fresh key, aimed at one invoice. */
+    private static String dueDateAmendment(String invoiceNumber, LocalDate dueDate) throws IOException {
+        ObjectNode root = (ObjectNode) JSON.readTree(
+                fixture("commands/invoice.amended/valid-amount-only.json", invoiceNumber));
+        ObjectNode payload = (ObjectNode) root.get("payload");
+        payload.remove("amount");
+        payload.put("dueDate", dueDate.toString());
+        return JSON.writeValueAsString(root);
+    }
+
+    @Test
+    void amendedDueDate_onAPlan_announcesTheMovedPlan() throws IOException {
+        String invoiceNumber = issuePlan();
+        LocalDate moved = LocalDate.now().plusDays(120);
+        String message = dueDateAmendment(invoiceNumber, moved);
+        int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", message);
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, before);
+        assertThat(events).extracting(ContractEventOutbox::getEventType)
+                .containsExactly("invoice.planAmended", "invoice.issued");
+        JsonNode amended = payloadOf(events.get(0));
+        assertThat(amended.get("reason").asText()).isEqualTo("DUE_DATE_AMENDED");
+        assertThat(amended.get("correlationId").asText()).isEqualTo(keyOf(message));
+        assertThat(amended.get("decidedBy").asText()).isEqualTo("aplikasi-akademik");
+        JsonNode plan = amended.get("paymentPlan");
+        assertThat(plan.get(plan.size() - 1).get("dueDate").asText()).isEqualTo(moved.toString());
+        assertThat(payloadOf(events.get(1)).get("dueDate").asText()).isEqualTo(moved.toString());
+    }
+
+    @Test
+    void amendedDueDate_onASinglePaymentInvoice_answersWithOneAnnouncement() throws IOException {
+        int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+        handler.handle("invoice-command", fixture("commands/invoice.requested/valid-single-payment.json", null));
+        String invoiceNumber = payloadOf(eventsFor(DEBTOR, before).get(0)).get("invoiceNumber").asText();
+        LocalDate moved = LocalDate.now().plusDays(60);
+        String message = dueDateAmendment(invoiceNumber, moved);
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        handler.handle("invoice-command", message);
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.issued");
+        assertThat(payloadOf(events.get(0)).get("dueDate").asText()).isEqualTo(moved.toString());
+        assertThat(payloadOf(events.get(0)).get("correlationId").asText()).isEqualTo(keyOf(message));
+    }
+
+    /**
+     * A date moved by an operator or over the REST API reaches the originating system too. Before
+     * this, only the gateway heard of it, and the upstream mirror kept chasing the old date.
+     */
+    @Test
+    void dueDateMovedOutsideACommand_isAnnouncedToo() throws IOException {
+        String planNumber = issuePlan();
+        String planId = invoiceRepository.findByInvoiceNumber(planNumber).orElseThrow().getId();
+        List<java.util.Map<String, Object>> legs = io.restassured.RestAssured.given()
+                .when().get("/api/invoices/{id}", planId).then().extract().path("installments");
+        String lastLegId = (String) legs.stream()
+                .max(java.util.Comparator.comparing(l -> (String) l.get("dueDate"))).orElseThrow().get("id");
+        LocalDate moved = LocalDate.now().plusDays(150);
+        int mark = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        io.restassured.RestAssured.given().contentType("application/json")
+                .body(java.util.Map.of("dueDate", moved.toString()))
+                .when().post("/api/installments/{id}/due-date", lastLegId).then().statusCode(204);
+
+        List<ContractEventOutbox> events = eventsFor(DEBTOR, mark);
+        assertThat(events).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.planAmended");
+        JsonNode amended = payloadOf(events.get(0));
+        assertThat(amended.get("reason").asText()).isEqualTo("DUE_DATE_AMENDED");
+        assertThat(amended.get("decidedBy").asText()).isEqualTo("api");
+        assertThat(amended.has("correlationId")).isFalse();
+
+        int before = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+        handler.handle("invoice-command", fixture("commands/invoice.requested/valid-single-payment.json", null));
+        String singleNumber = payloadOf(eventsFor(DEBTOR, before).get(0)).get("invoiceNumber").asText();
+        String singleId = invoiceRepository.findByInvoiceNumber(singleNumber).orElseThrow().getId();
+        int mark2 = outbox.findByMessageKeyOrderByCreatedAtAsc(DEBTOR).size();
+
+        io.restassured.RestAssured.given().contentType("application/json")
+                .body(java.util.Map.of("dueDate", moved.toString()))
+                .when().post("/api/invoices/{id}/due-date", singleId).then().statusCode(204);
+
+        List<ContractEventOutbox> single = eventsFor(DEBTOR, mark2);
+        assertThat(single).extracting(ContractEventOutbox::getEventType).containsExactly("invoice.issued");
+        assertThat(payloadOf(single.get(0)).get("dueDate").asText()).isEqualTo(moved.toString());
+        assertThat(payloadOf(single.get(0)).has("correlationId")).isFalse();
     }
 
     @Test

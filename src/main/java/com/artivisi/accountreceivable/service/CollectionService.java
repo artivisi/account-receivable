@@ -373,9 +373,14 @@ public class CollectionService {
      * republishes a revised bill under the SAME number; without this the receivable keeps the first
      * version, and once AR started sending expiry that meant a charge could be born already expired
      * — its VA retired by the sweep and a real payment refused at the bank.
+     *
+     * <p>The moved date is re-announced as invoice.issued whoever moved it. The originating system
+     * mirrors the invoice, and an operator's correction it is never told about leaves that mirror
+     * chasing the old date. {@code correlationId} is the command's key when a command moved it.
      */
     @Transactional
-    public DueDateOutcome amendDueDate(String invoiceId, LocalDate newDueDate, String reference) {
+    public DueDateOutcome amendDueDate(String invoiceId, LocalDate newDueDate, String reference,
+                                       String correlationId) {
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new NotFoundException("Invoice not found: " + invoiceId));
         if (invoice.isInstallment()) {
@@ -404,6 +409,7 @@ public class CollectionService {
             chargeRepository.save(charge);
             moved++;
         }
+        contractEvents.invoiceIssued(invoice, correlationId);
         DueDateOutcome outcome = describe(charges, moved);
         auditService.record("INVOICE_DUE_DATE_AMENDED", "Invoice", invoiceId,
                 "from=" + previous + " to=" + newDueDate + " outcome=" + outcome.kind()
@@ -453,9 +459,15 @@ public class CollectionService {
      * the payer is late on. Until this existed that redirection led nowhere: an installment's
      * deadline could not be moved by any route, UI or API — and a monthly fee whose payer turns up
      * after the VA lapsed is the ordinary case, not the exotic one.
+     *
+     * <p>The new plan goes out as invoice.planAmended whoever moved the date, the same event a
+     * planAmended command produces. Without it an operator's edit reached the gateway and never the
+     * originating system, whose mirror then kept the old date. {@code correlationId} is the command's
+     * key when a command moved it.
      */
     @Transactional
-    public void amendInstallmentDueDate(String installmentId, LocalDate newDueDate, String reference) {
+    public void amendInstallmentDueDate(String installmentId, LocalDate newDueDate, String reference,
+                                        String decidedBy, String correlationId) {
         Installment installment = installmentRepository.findById(installmentId)
                 .orElseThrow(() -> new NotFoundException("Installment not found: " + installmentId));
         PaymentStatus status = installment.getPaymentStatus();
@@ -480,6 +492,7 @@ public class CollectionService {
         // the amount due — a leg moved into the past rolls into what the VA answers today.
         invoice.setDueDate(invoice.getSchedule().lastDueDate());
         invoiceRepository.save(invoice);
+        contractEvents.planAmended(invoice, correlationId, "DUE_DATE_AMENDED", reference, decidedBy);
         syncPlanCharge(invoice, "INSTALLMENT_DUE");
         auditService.record("INSTALLMENT_DUE_DATE_AMENDED", "Installment", installmentId,
                 "invoice=" + invoice.getId() + " sequence=" + installment.getSequence()

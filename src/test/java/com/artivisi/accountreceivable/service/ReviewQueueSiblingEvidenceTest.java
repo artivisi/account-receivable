@@ -102,7 +102,7 @@ class ReviewQueueSiblingEvidenceTest extends AbstractIntegrationTest {
         given().contentType("application/json").header("X-Signature", sign(body)).body(body)
                 .when().post("/webhooks/gateway").then().statusCode(200);
 
-        DueDateOutcome outcome = collectionService.amendDueDate(replaced, LocalDate.now().plusDays(45), null);
+        DueDateOutcome outcome = collectionService.amendDueDate(replaced, LocalDate.now().plusDays(45), null, null);
 
         assertThat(outcome.kind()).isEqualTo(DueDateOutcome.Kind.STILL_UNPAYABLE);
         assertThat(outcome.restoredVas()).isZero();

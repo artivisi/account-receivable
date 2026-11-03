@@ -93,7 +93,7 @@ public class ContractCommandService {
         try {
             return switch (type) {
                 case "invoice.requested" -> invoiceRequested(payload);
-                case "invoice.amended" -> invoiceAmended(payload);
+                case "invoice.amended" -> invoiceAmended(payload, producer);
                 case "invoice.planAmended" -> planAmended(payload, producer);
                 case "invoice.cancelled" -> invoiceCancelled(payload, producer);
                 case "invoice.credited" -> invoiceCredited(payload, producer);
@@ -150,25 +150,33 @@ public class ContractCommandService {
         return onInvoiceEvent(debtorCode, result);
     }
 
-    private CommandResult invoiceAmended(JsonNode p) {
+    private CommandResult invoiceAmended(JsonNode p, String producer) {
         Invoice invoice = load(p.get("invoiceNumber").asText());
         assertAmendable(invoice);
         String reference = reference(p);
+        String idempotencyKey = p.get("idempotencyKey").asText();
         if (p.hasNonNull("amount")) {
             collectionService.amendAmount(invoice.getId(), new BigDecimal(p.get("amount").asText()),
                     p.get("reason").asText(), reference);
         }
+        // A moved date on a single-payment invoice is announced by the service itself, on every path;
+        // that announcement is then this command's answer, rather than a second identical one.
+        boolean announced = false;
         if (p.hasNonNull("dueDate")) {
             LocalDate dueDate = LocalDate.parse(p.get("dueDate").asText());
             if (invoice.isInstallment()) {
                 var last = invoice.getSchedule().ordered().getLast();
-                collectionService.amendInstallmentDueDate(last.getId(), dueDate, reference);
+                collectionService.amendInstallmentDueDate(last.getId(), dueDate, reference, producer, idempotencyKey);
             } else {
-                collectionService.amendDueDate(invoice.getId(), dueDate, reference);
+                announced = !dueDate.equals(invoice.getDueDate());
+                collectionService.amendDueDate(invoice.getId(), dueDate, reference, idempotencyKey);
             }
         }
         Invoice after = invoiceRepository.findById(invoice.getId()).orElseThrow();
-        return onInvoiceEvent(after.getDebtor().getCode(), events.invoiceIssued(after, p.get("idempotencyKey").asText()));
+        String debtorCode = after.getDebtor().getCode();
+        return onInvoiceEvent(debtorCode, announced
+                ? events.lastEvent(debtorCode, "invoice.issued")
+                : events.invoiceIssued(after, idempotencyKey));
     }
 
     private CommandResult planAmended(JsonNode p, String producer) {
@@ -278,6 +286,11 @@ public class ContractCommandService {
     private CommandResult announcementRequested(JsonNode p) {
         Invoice invoice = load(p.get("invoiceNumber").asText());
         String result = events.invoiceIssued(invoice, null);
+        // The same three facts issuance announces: an upstream mirror rebuilt from this must end up
+        // with the plan as it stands, not the one it last heard of.
+        if (invoice.isInstallment()) {
+            events.planAmended(invoice, null, "ANNOUNCED", null, "ar");
+        }
         chargeRepository.findByInvoiceId(invoice.getId()).stream()
                 .filter(c -> c.getStatus() == ChargeStatus.ACTIVE)
                 .findFirst()

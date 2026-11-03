@@ -276,7 +276,7 @@ public class InvoiceAdminController {
                                @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
                                RedirectAttributes ra) {
         try {
-            report(collectionService.amendDueDate(id, dueDate, null), ra);
+            report(collectionService.amendDueDate(id, dueDate, null, null), ra);
         } catch (RuntimeException e) {
             ra.addFlashAttribute("error", e.getMessage());
         }
@@ -288,7 +288,7 @@ public class InvoiceAdminController {
                                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
                                           RedirectAttributes ra) {
         try {
-            collectionService.amendInstallmentDueDate(installmentId, dueDate, null);
+            collectionService.amendInstallmentDueDate(installmentId, dueDate, null, "ar-admin", null);
             ra.addFlashAttribute("msg", "Jatuh tempo cicilan diperbarui");
         } catch (RuntimeException e) {
             ra.addFlashAttribute("error", e.getMessage());

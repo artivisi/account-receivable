@@ -41,7 +41,7 @@ public class ChargeController {
     @PostMapping("/api/invoices/{id}/due-date")
     public ResponseEntity<Void> amendDueDate(@PathVariable String id,
                                              @Valid @RequestBody AmendDueDateRequest request) {
-        service.amendDueDate(id, request.dueDate(), null);
+        service.amendDueDate(id, request.dueDate(), null, null);
         return ResponseEntity.noContent().build();
     }
 
@@ -52,7 +52,7 @@ public class ChargeController {
     @PostMapping("/api/installments/{id}/due-date")
     public ResponseEntity<Void> amendInstallmentDueDate(@PathVariable String id,
                                                         @Valid @RequestBody AmendDueDateRequest request) {
-        service.amendInstallmentDueDate(id, request.dueDate(), null);
+        service.amendInstallmentDueDate(id, request.dueDate(), null, "api", null);
         return ResponseEntity.noContent().build();
     }
 
