@@ -83,18 +83,18 @@ class InstallmentCollectionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void overdueLegs_rollIntoWhatTheVaAnswers() {
-        // Two legs already overdue, one to come: the VA asks for both overdue ones at once.
-        String invoiceId = seedPlan("plan-roll", LocalDate.now().minusDays(20), LocalDate.now().minusDays(5),
+    void anOverdueLeg_bringsTheNextLegForward_atOnce() {
+        // Leg 1 overdue, leg 2 not yet due: the VA asks for 1+2 now, not from leg 2's own date.
+        String invoiceId = seedPlan("plan-roll", LocalDate.now().minusDays(20), LocalDate.now().plusDays(10),
                 LocalDate.now().plusDays(40));
         api.openCharge(invoiceId).then().body("amount", equalTo(4_000_000.0F));
 
-        // Time passes: the third leg falls due too. Moving its date is how a test makes that happen;
-        // the periodic sync then reprices the live charge to the full remainder.
+        // Time passes: leg 2 lapses too. Moving its date is how a test makes that happen; leg 3 then
+        // rides with both, and the live charge is repriced to the full remainder.
         int repricesBefore = gatewayRepriceCount();
-        String thirdLegId = given().when().get("/api/invoices/{id}", invoiceId).then().extract().path("installments[2].id");
+        String secondLegId = given().when().get("/api/invoices/{id}", invoiceId).then().extract().path("installments[1].id");
         given().contentType("application/json").body(Map.of("dueDate", LocalDate.now().minusDays(1).toString()))
-                .when().post("/api/installments/{id}/due-date", thirdLegId).then().statusCode(204);
+                .when().post("/api/installments/{id}/due-date", secondLegId).then().statusCode(204);
         assertThat(gatewayRepriceCount()).isEqualTo(repricesBefore + 1);
         assertThat(lastRepriceAmount).isEqualTo("6000000.00");
         assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("6000000");
@@ -198,13 +198,20 @@ class InstallmentCollectionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void amendPlan_keepsAnOverdueLegOnItsDate_soThePayerCanClearItAlone() {
-        // Two legs overdue, so the VA asks for both. Relief is approved: the payer clears the older
-        // leg first and the rest moves out. The older leg keeps the date it fell due — aging must
-        // still see it as late — and the VA drops to that leg alone.
+    void aLegDueToday_isNotYetOverdue() {
+        // The due date is inclusive: on it the VA still answers leg 1 alone.
+        String invoiceId = seedPlan("plan-today", LocalDate.now(), LocalDate.now().plusDays(30));
+        api.openCharge(invoiceId).then().body("amount", equalTo(3_000_000.0F));
+    }
+
+    @Test
+    void amendPlan_keepsAnOverdueLegOnItsDate_andTheNextLegRidesWithIt() {
+        // Two legs overdue, so the VA asks for all three. The rest is rescheduled: the older leg
+        // keeps the date it fell due — aging must still see it as late — so the next leg still
+        // rides with it. Clearing an overdue leg alone is no longer possible on the VA.
         LocalDate older = LocalDate.now().minusDays(20);
         String invoiceId = seedPlan("plan-relief", older, LocalDate.now().minusDays(5), LocalDate.now().plusDays(40));
-        api.openCharge(invoiceId).then().body("amount", equalTo(4_000_000.0F));
+        api.openCharge(invoiceId).then().body("amount", equalTo(6_000_000.0F));
 
         api.amendPlan(invoiceId, List.of(
                         ApiClient.installment(older, 2_000_000),
@@ -215,9 +222,9 @@ class InstallmentCollectionIntegrationTest extends AbstractIntegrationTest {
                 .body("installments[0].dueDate", equalTo(older.toString()))
                 .body("dueDate", equalTo(LocalDate.now().plusDays(60).toString()))
                 .body("outstanding", equalTo(6_000_000.0F));
-        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("2000000");
+        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("4000000");
 
-        payLive(invoiceId, "RELIEF-1", 2_000_000);
+        payLive(invoiceId, "RELIEF-1", 4_000_000);
         assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("2000000");
     }
 
@@ -238,8 +245,8 @@ class InstallmentCollectionIntegrationTest extends AbstractIntegrationTest {
                 .then().statusCode(200)
                 .body("installments[0].dueDate", equalTo(overdue.toString()))
                 .body("installments[1].dueDate", equalTo(LocalDate.now().plusDays(20).toString()));
-        // Only the overdue month is due today; the new one is not asked for early.
-        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("6000000");
+        // The overdue month brings the new one forward with it.
+        assertThat(live(invoiceId).getAmount()).isEqualByComparingTo("8000000");
     }
 
     @Test

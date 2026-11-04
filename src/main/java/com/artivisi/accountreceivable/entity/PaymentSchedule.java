@@ -52,9 +52,13 @@ public class PaymentSchedule extends BaseEntity {
     }
 
     /**
-     * What the plan's single VA must answer on {@code today}: every unpaid installment that has fallen
-     * due, plus the next unpaid one if none has. An installment that passes its date unpaid therefore
-     * rolls into the next; nothing beyond the next is ever asked for early.
+     * What the plan's single VA must answer on {@code today}: every unpaid installment that is
+     * overdue, plus the next unpaid one that is not. An installment that passes its date unpaid
+     * therefore rides with the next one from the following day — campus finance's rule (2026-11-03):
+     * arrears on leg 1 make leg 2 worth 1+2 as soon as leg 1 is late, not on leg 2's own date.
+     *
+     * <p>A due date is inclusive, as {@code CollectionService.expiryFor} has it: a leg due today is
+     * not yet overdue, so on that day the VA still answers it alone.
      *
      * <p>This is the rule the whole instalment design rests on. The VA number space has no room for
      * an installment index, so one CLOSED charge is repriced through the plan, and this figure is
@@ -67,11 +71,13 @@ public class PaymentSchedule extends BaseEntity {
             if (leg.getOutstanding().signum() == 0) {
                 continue;
             }
-            boolean fallen = !leg.getDueDate().isAfter(today);
-            if (fallen || !nextTaken) {
+            boolean overdue = leg.getDueDate().isBefore(today);
+            if (overdue || !nextTaken) {
                 due = due.add(leg.getOutstanding());
             }
-            nextTaken = true;
+            if (!overdue) {
+                nextTaken = true;
+            }
         }
         return due;
     }

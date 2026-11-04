@@ -187,7 +187,7 @@ public class InvoiceService {
     /**
      * Apply a payment received on a plan's single VA to its installments, earliest due first.
      *
-     * <p>The VA answers the sum of every installment that has fallen due plus the next one, so a
+     * <p>The VA answers the sum of every overdue installment plus the next one, so a
      * payment normally settles exactly those legs. The allocation is still done leg by leg rather
      * than assumed, because a manual receipt may have part-paid a leg in between.
      */
